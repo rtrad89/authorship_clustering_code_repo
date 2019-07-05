@@ -118,7 +118,16 @@ class LssModeller:
         print("**************************************************************")
 
     def load_lss_representation_into_df(self) -> pd.DataFrame:
-        """Load a BoT LSS representation from disk to a returned dataframe"""
+        """
+        Load a BoT LSS representation from disk to a returned dataframe.
+
+        Returns
+        -------
+        lss_df : pd.DataFrame
+            A matrix of shape (n_samples, n_features)
+
+        """
+
         path = r"{}\{}\mode-word-assignments.dat".format(
                 self.input_docs_path,
                 self.hdp_output_directory)
@@ -127,10 +136,10 @@ class LssModeller:
         # of a bag-of-topics model (BoT)
         lss_df = pd.read_csv(filepath_or_buffer=path, delim_whitespace=True)
 #                             usecols=["d", "w", "z"]).drop_duplicates()
-        # Procude topic weights as counts of topic words
-        lss_df = pd.DataFrame(
-                lss_df.groupby(by=["d", "z"]).w.count()
-                ).reset_index()
+        # Produce topic weights as counts of topic words
+        lss_df = lss_df.pivot_table(
+                values='w', columns='z', index='d',
+                aggfunc='count', fill_value=0)
         return lss_df
 
 
