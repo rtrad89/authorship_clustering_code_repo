@@ -8,6 +8,7 @@ from shutil import rmtree
 from gensim.corpora import Dictionary, bleicorpus
 # from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+from nltk.util import ngrams
 import time
 import pandas as pd
 
@@ -44,8 +45,27 @@ class LssModeller:
             print("> ERROR: Please make sure the {} folder"
                   "is not used by some process").format(dir_path)
 
-    def _convert_corpus_to_bow(self) -> list:
-        """Convert a directory of text files into a BoW model"""
+    def _convert_corpus_to_bow(self, word_grams=1):
+        """
+        Convert a directory of text files into a BoW model.
+
+        Parameters
+        ----------
+        word_grams : int (optional)
+            The number of words to combine as features. 1 is the default value,
+            and it denotes the usage of word unigrams.
+
+        Returns
+        -------
+        bow_corpus : gnesim corpus
+            The bag-of-words model.
+
+        dictionary : gensim dictionary
+            The id2word mapping.
+
+        plain_documents : list
+            The list of plain documents, to serve as a reference point.
+        """
         # Read in the plain text files
         plain_documents = []
         with os.scandir(self.input_docs_path) as docs:
@@ -57,21 +77,22 @@ class LssModeller:
                     # Raised when trying to open a directory
                     print("\tDirectory {} skipped".format(doc.path))
                     pass
-
-        # Tokenise corpus and remove empty documents
+        # Collocation Detection can be applied here via gensim.models.phrases
+        # Tokenise corpus and remove too short documents
         tokenised_corpus = [
-                [w for w in word_tokenize(d.lower())]
-                for d in plain_documents if len(d) > 0]
+                [' '.join(tkn) for tkn in
+                 ngrams(word_tokenize(d.lower()), word_grams)]
+                for d in plain_documents if len(d) > 3]
 
         # Form the word ids dictionary for vectorisation
         dictionary = Dictionary(tokenised_corpus)
         bow_corpus = [dictionary.doc2bow(t_d) for t_d in tokenised_corpus]
-        return(bow_corpus, dictionary)
+        return(bow_corpus, dictionary, plain_documents)
 
     def _generate_lda_c_corpus(self):
         """ Convert a group of files LDA_C corpus and store it on disk"""
         print("> Converting doclines into LDA-C and storing to disk")
-        bow_corpus, id2word_map = self._convert_corpus_to_bow()
+        bow_corpus, id2word_map, plain_docs = self._convert_corpus_to_bow()
         # Sterialise into LDA_C and store on disk
         output_dir = r"{}\lda_c_format".format(self.input_docs_path)
         self._initialise_directory(output_dir)
@@ -81,6 +102,7 @@ class LssModeller:
         bleicorpus.BleiCorpus.serialize(
                 fname=save_location, corpus=bow_corpus,
                 id2word=id2word_map)
+        return plain_docs
 
     def _invoke_gibbs_hdp(self, param_num_iter):
         """Invoke Gibbs hdp posterior inference on the corpus"""
@@ -102,10 +124,19 @@ class LssModeller:
 
         return ret.stdout
 
-    def infer_lss_representation(self, param_num_iter="25"):
-        """Produce an LSS representation of text files and save it to disk"""
-        # Make the text files into an LDA-C corpus
-        self._generate_lda_c_corpus()
+    def infer_lss_representation(self, param_num_iter="25") -> list:
+        """
+        Produce an LSS representation of text files and save it to disk
+
+        Returns
+        -------
+        plain_docs : list
+            The original plain documents which were saved to disk as LDA-C.
+            They are returned for verification purposes.
+        """
+
+        # Make the text files into an LDA-C corpus and return a copy of them
+        plain_docs = self._generate_lda_c_corpus()
         # Run Gibbs HDP on the LDA-C corpus
         print("\n> Starting HDP with {} iterations...".format(param_num_iter))
         t = time.perf_counter()
@@ -116,6 +147,7 @@ class LssModeller:
               "and yielded the message:\n{y}"
                ).format(x=nt-t, y=output_hdp))
         print("**************************************************************")
+        return plain_docs
 
     def load_lss_representation_into_df(self) -> pd.DataFrame:
         """
@@ -147,13 +179,11 @@ Modeller = LssModeller(hdp_path=r"..\..\hdps\hdp",
                        input_docs_path=r"..\data\toy_corpus",
                        ldac_filename=r"dummy_ldac_corpus",
                        hdp_output_dir=r"hdp_lss")
-df = Modeller.load_lss_representation_into_df()
+df = Modeller.infer_lss_representation()
 # =============================================================================
 # def main():
 #     print("Main thread started..\n")
 #     corpus = fetch_20newsgroups(subset="train")
-# 
-# 
 # if __name__ == "__main__":
 #     main()
 # =============================================================================
