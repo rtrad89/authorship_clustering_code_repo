@@ -18,6 +18,7 @@ class LssModeller:
 
     # Constructor
     def __init__(self, hdp_path: str, input_docs_path: str,
+                 input_amazon_path: str, input_amazon_fname: str,
                  ldac_filename: str, hdp_output_dir: str):
         """Default Constructor
 
@@ -33,6 +34,8 @@ class LssModeller:
 
         self.hdp_path = hdp_path
         self.input_docs_path = input_docs_path
+        self.input_amazon_path = input_amazon_path
+        self.inpue_amazon_filename = input_amazon_fname
         self.lda_c_fname = ldac_filename
         self.hdp_output_directory = hdp_output_dir
 
@@ -82,7 +85,6 @@ class LssModeller:
 
     def _generate_lda_c_corpus(self):
         """ Convert a group of files LDA_C corpus and store it on disk"""
-        print("> Converting doclines into LDA-C and storing to disk")
         bow_corpus, id2word_map, plain_docs = self._convert_corpus_to_bow()
         # Sterialise into LDA_C and store on disk
         output_dir = r"{}\lda_c_format".format(self.input_docs_path)
@@ -93,6 +95,41 @@ class LssModeller:
                 fname=save_location, corpus=bow_corpus,
                 id2word=id2word_map)
         return plain_docs
+
+    def _convert_series_to_bow(self, words_threshold=10, word_grams=4):
+        """Convert a series of texts to BoW represetaion"""
+
+        # Load the data into a pandas dataframe
+        amazon_df = AmazonParser.get_dataframe(r"{}\{}".format(
+                self.input_amazon_path, self.inpue_amazon_filename))
+        # FOR TESTING
+        amazon_df = amazon_df.tail(50)
+        # Tokenise
+        amazon_df["tokenised"] = amazon_df.reviewText.str.lower().apply(
+                word_tokenize)
+        # Filter out any too short reviews (less than words_threshold)
+        amazon_df = amazon_df[amazon_df.tokenised.map(len) >= words_threshold]
+        # Construct the word grams
+        amazon_df.tokenised = [
+                [' '.join(tkn) for tkn in
+                 ngrams(r, word_grams)]
+                for r in amazon_df.tokenised]
+        # Establish the dictionary
+        dictionary = Dictionary(amazon_df.tokenised)
+        amazon_df["bow"] = amazon_df.tokenised.apply(dictionary.doc2bow)
+        return (amazon_df, dictionary)
+
+    def generate_lda_c_from_dataframe(self):
+        amazon_df, id2word_map = self._convert_series_to_bow()
+        # Sterialise it to disk as LDA-C
+        output_dir = r"{}\lda_c_format".format(self.input_amazon_path)
+        DiskTools.initialise_directory(output_dir)
+        save_location = r"{}\{}.dat".format(
+                output_dir, self.lda_c_fname)
+        bleicorpus.BleiCorpus.serialize(
+                fname=save_location, corpus=amazon_df.bow,
+                id2word=id2word_map)
+        return amazon_df
 
     def _invoke_gibbs_hdp(self, param_num_iter):
         """Invoke Gibbs hdp posterior inference on the corpus"""
@@ -167,13 +204,17 @@ class LssModeller:
 
 Modeller = LssModeller(hdp_path=r"..\..\hdps\hdp",
                        input_docs_path=r"..\data\toy_corpus",
+                       input_amazon_path=r"..\..\..\Datasets\Amazon",
+                       input_amazon_fname=r"reviews_Automotive_5.json.gz",
                        ldac_filename=r"dummy_ldac_corpus",
                        hdp_output_dir=r"hdp_lss")
-df = Modeller.infer_lss_representation()
+# Make sure that the original documents are reconstructable from LDA-C
+# In order to use extrinsic clustering evaluation metrics, such as purity
+Modeller.generate_lda_c_from_dataframe()
 # =============================================================================
 # def main():
 #     print("Main thread started..\n")
-#     corpus = fetch_20newsgroups(subset="train")
+
 # if __name__ == "__main__":
 #     main()
 # =============================================================================

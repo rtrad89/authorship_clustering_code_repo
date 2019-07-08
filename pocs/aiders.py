@@ -51,7 +51,7 @@ class AmazonParser:
             yield eval(l)
 
     @staticmethod
-    def get_dataframe(path: str, columns: list):
+    def get_dataframe(path: str, columns=["reviewerID", "reviewText"]):
         """
         Reads an Amazon json.gz data file into a pandas dataframe.
 
@@ -59,6 +59,9 @@ class AmazonParser:
         ----------
         path : str
             The path to where the data file is located
+
+        columns : list of str
+            The list of columns' names to include in the dataframe
 
         Examples
         --------
