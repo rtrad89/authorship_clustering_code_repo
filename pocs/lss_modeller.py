@@ -4,13 +4,13 @@
 """
 import subprocess as s
 import os
-from shutil import rmtree
 from gensim.corpora import Dictionary, bleicorpus
 # from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.util import ngrams
 import time
 import pandas as pd
+from aiders import AmazonParser, DiskTools
 
 
 class LssModeller:
@@ -35,15 +35,6 @@ class LssModeller:
         self.input_docs_path = input_docs_path
         self.lda_c_fname = ldac_filename
         self.hdp_output_directory = hdp_output_dir
-
-    def _initialise_directory(self, dir_path):
-        try:
-            if os.path.exists(dir_path):
-                rmtree(dir_path)
-            os.mkdir(dir_path)
-        except PermissionError:
-            print("> ERROR: Please make sure the {} folder"
-                  "is not used by some process").format(dir_path)
 
     def _convert_corpus_to_bow(self, word_grams=1):
         """
@@ -95,8 +86,7 @@ class LssModeller:
         bow_corpus, id2word_map, plain_docs = self._convert_corpus_to_bow()
         # Sterialise into LDA_C and store on disk
         output_dir = r"{}\lda_c_format".format(self.input_docs_path)
-        self._initialise_directory(output_dir)
-
+        DiskTools.initialise_directory(output_dir)
         save_location = r"{}\{}.dat".format(
                 output_dir, self.lda_c_fname)
         bleicorpus.BleiCorpus.serialize(
