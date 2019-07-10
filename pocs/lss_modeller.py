@@ -11,6 +11,7 @@ from nltk.util import ngrams
 import time
 import pandas as pd
 from aiders import AmazonParser, DiskTools
+from typing import Tuple  # , overload
 
 
 class LssModeller:
@@ -19,7 +20,7 @@ class LssModeller:
     # Constructor
     def __init__(self, hdp_path: str, input_docs_path: str,
                  input_amazon_path: str, input_amazon_fname: str,
-                 ldac_filename: str, hdp_output_dir: str):
+                 ldac_filename: str, hdp_output_dir: str, hdp_iters: int):
         """Default Constructor
 
         Parameters
@@ -38,8 +39,9 @@ class LssModeller:
         self.input_amazon_filename = input_amazon_fname
         self.lda_c_fname = ldac_filename
         self.hdp_output_directory = hdp_output_dir
+        self.hdp_iterations = hdp_iters
 
-    def convert_corpus_to_bow(self, word_grams=1):
+    def _convert_corpus_to_bow(self, word_grams=1):
         """
         Convert a directory of text files into a BoW model.
 
@@ -96,14 +98,13 @@ class LssModeller:
                 id2word=id2word_map)
         return plain_docs
 
-    def convert_series_to_bow(self, words_threshold=10, word_grams=4):
+    def _convert_series_to_bow(self, words_threshold=10, word_grams=4):
         """Convert a series of texts to BoW represetaion"""
 
         # Load the data into a pandas dataframe
         amazon_df = AmazonParser.get_dataframe(r"{}\{}".format(
                 self.input_amazon_path, self.input_amazon_filename))
-        # FOR TESTING
-        amazon_df = amazon_df.tail(50)
+
         # Tokenise
         amazon_df["tokenised"] = amazon_df.reviewText.str.lower().apply(
                 word_tokenize)
@@ -131,7 +132,7 @@ class LssModeller:
                 id2word=id2word_map)
         return amazon_df
 
-    def _invoke_gibbs_hdp(self, param_num_iter):
+    def _invoke_gibbs_hdp(self):
         """Invoke Gibbs hdp posterior inference on the corpus"""
         path_executable = r"{}\hdp.exe".format(self.hdp_path)
         param_data = r"{}\lda_c_format\{}.dat".format(self.input_docs_path,
@@ -145,13 +146,13 @@ class LssModeller:
                      "--algorithm",     "train",
                      "--data",          param_data,
                      "--directory",     param_directory,
-                     "--max_iter",      param_num_iter,
+                     "--max_iter",      str(self.hdp_iterations),
                      "--save_lag",      "-1"],
                     check=True, capture_output=True, text=True)
 
         return ret.stdout
 
-    def _invoke_gibbs_hdp_amazon(self, param_num_iter):
+    def _invoke_gibbs_hdp_amazon(self):
         """Invoke Gibbs hdp posterior inference on the corpus"""
         path_executable = r"{}\hdp.exe".format(self.hdp_path)
         param_data = r"{}\lda_c_format\{}.dat".format(
@@ -166,13 +167,13 @@ class LssModeller:
                      "--algorithm",     "train",
                      "--data",          param_data,
                      "--directory",     param_directory,
-                     "--max_iter",      param_num_iter,
+                     "--max_iter",      str(self.hdp_iterations),
                      "--save_lag",      "-1"],
                     check=True, capture_output=True, text=True)
 
         return ret.stdout
 
-    def infer_lss_representation(self, param_num_iter="25") -> list:
+    def _infer_lss_representation(self, param_num_iter="25") -> list:
         """
         Produce an LSS representation of text files and save it to disk
 
@@ -197,7 +198,7 @@ class LssModeller:
         print("**************************************************************")
         return plain_docs
 
-    def infer_amazon_lss_representation(self, param_num_iter="25") -> list:
+    def _infer_amazon_lss_representation(self) -> list:
         """
         Produce an LSS representation of text files and save it to disk
 
@@ -211,10 +212,10 @@ class LssModeller:
         # Make the text files into an LDA-C corpus and return a copy of them
         amazon_df = self._generate_lda_c_from_dataframe()
         # Run Gibbs HDP on the LDA-C corpus
-        print("\n> Starting HDP with {} iterations...".format(param_num_iter))
+        print("\n> Starting HDP with {} iterations...".format(
+                self.hdp_iterations))
         t = time.perf_counter()
-        output_hdp = self._invoke_gibbs_hdp_amazon(
-                param_num_iter=param_num_iter)
+        output_hdp = self._invoke_gibbs_hdp_amazon()
         nt = time.perf_counter()
         print("************************************************************\n")
         print(("HDP executed in {x:0.2f} seconds "
@@ -223,7 +224,7 @@ class LssModeller:
         print("**************************************************************")
         return amazon_df
 
-    def load_lss_representation_into_df(self) -> pd.DataFrame:
+    def _load_lss_representation_into_df(self) -> pd.DataFrame:
         """
         Load a BoT LSS representation from disk to a returned dataframe.
 
@@ -248,7 +249,7 @@ class LssModeller:
                 aggfunc='count', fill_value=0)
         return lss_df
 
-    def load_amazon_lss_representation_into_df(self) -> pd.DataFrame:
+    def _load_amazon_lss_representation_into_df(self) -> pd.DataFrame:
         """
         Load a BoT LSS representation from disk to a returned dataframe.
 
@@ -273,18 +274,40 @@ class LssModeller:
                 aggfunc='count', fill_value=0)
         return lss_df
 
+    def get_amazon_lss(self, infer_lss) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Get high- and low-dimenstional representation of data
 
-Modeller = LssModeller(hdp_path=r"..\..\hdps\hdp",
-                       input_docs_path=r"..\data\toy_corpus",
-                       input_amazon_path=r"..\..\..\Datasets\Amazon",
-                       input_amazon_fname=r"reviews_Automotive_5.json.gz",
-                       ldac_filename=r"dummy_ldac_corpus",
-                       hdp_output_dir=r"hdp_lss")
+        Parameters
+        ----------
+        infer_lss: bool, optional
+            If `True`, hdp will be run again to generate the LSS representation
+            on disk. `False` means the representation was already generated and
+            can be loaded from disk.
 
-# =============================================================================
-# def main():
-#     print("Main thread started..\n")
+        """
 
-# if __name__ == "__main__":
-#     main()
-# =============================================================================
+        if infer_lss:
+            bow_df = self._infer_amazon_lss_representation()
+        else:
+            bow_df = self._convert_series_to_bow()
+
+        return bow_df, self._load_amazon_lss_representation_into_df()
+
+
+def main():
+    print("Main thread started..\n")
+    Modeller = LssModeller(
+            hdp_path=r"..\..\hdps\hdp",
+            input_docs_path=r"..\data\toy_corpus",
+            input_amazon_path=r"..\..\..\Datasets\Amazon",
+            input_amazon_fname=r"reviews_Automotive_5.json.gz",
+            ldac_filename=r"dummy_ldac_corpus",
+            hdp_output_dir=r"hdp_lss",
+            hdp_iters=10)
+
+    Modeller.get_amazon_lss(infer_lss=True)
+
+
+if __name__ == "__main__":
+    main()
