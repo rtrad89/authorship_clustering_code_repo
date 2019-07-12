@@ -12,7 +12,7 @@ from sklearn.metrics.cluster import (adjusted_mutual_info_score,
                                      adjusted_rand_score)
 
 
-class AuthorClusterer:
+class Clusterer:
 
     def __init__(self, dtm: pd.DataFrame, label_col_name: str,
                  min_cluster_size: int,

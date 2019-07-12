@@ -20,7 +20,8 @@ class LssModeller:
     # Constructor
     def __init__(self, hdp_path: str, input_docs_path: str,
                  input_amazon_path: str, input_amazon_fname: str,
-                 ldac_filename: str, hdp_output_dir: str, hdp_iters: int):
+                 ldac_filename: str, hdp_output_dir: str, hdp_iters: int,
+                 word_grams: int):
         """Default Constructor
 
         Parameters
@@ -40,8 +41,9 @@ class LssModeller:
         self.lda_c_fname = ldac_filename
         self.hdp_output_directory = hdp_output_dir
         self.hdp_iterations = hdp_iters
+        self.word_grams = word_grams
 
-    def _convert_corpus_to_bow(self, word_grams=1):
+    def _convert_corpus_to_bow(self):
         """
         Convert a directory of text files into a BoW model.
 
@@ -67,17 +69,17 @@ class LssModeller:
         with os.scandir(self.input_docs_path) as docs:
             for doc in docs:
                 try:
-                    f = open(doc.path, "r")
+                    f = open(doc.path, mode="r", encoding="utf8")
                     plain_documents.append(f.read())
                 except PermissionError:
                     # Raised when trying to open a directory
-                    print("\tDirectory {} skipped".format(doc.path))
+                    print("Directory {} skipped".format(doc.path))
                     pass
         # Collocation Detection can be applied here via gensim.models.phrases
         # Tokenise corpus and remove too short documents
         tokenised_corpus = [
                 [' '.join(tkn) for tkn in
-                 ngrams(word_tokenize(d.lower()), word_grams)]
+                 ngrams(word_tokenize(d.lower()), self.word_grams)]
                 for d in plain_documents if len(d) > 3]
 
         # Form the word ids dictionary for vectorisation
@@ -96,10 +98,19 @@ class LssModeller:
         bleicorpus.BleiCorpus.serialize(
                 fname=save_location, corpus=bow_corpus,
                 id2word=id2word_map)
-        return plain_docs
+        return plain_docs, bow_corpus
 
-    def _convert_series_to_bow(self, words_threshold=10, word_grams=4):
-        """Convert a series of texts to BoW represetaion"""
+    def _convert_series_to_bow(self, words_threshold=10):
+        """
+        Convert a series of texts to BoW represetaion
+
+        Parameters
+        ----------
+        words_threshold : int
+            The minimum amount of words in a document to be included in the
+            representation. Documents which contain a smaller amount of words
+            shall be excluded.
+        """
 
         # Load the data into a pandas dataframe
         amazon_df = AmazonParser.get_dataframe(r"{}\{}".format(
@@ -113,7 +124,7 @@ class LssModeller:
         # Construct the word grams
         amazon_df.tokenised = [
                 [' '.join(tkn) for tkn in
-                 ngrams(r, word_grams)]
+                 ngrams(r, self.word_grams)]
                 for r in amazon_df.tokenised]
         # Establish the dictionary
         dictionary = Dictionary(amazon_df.tokenised)
@@ -121,6 +132,19 @@ class LssModeller:
         return (amazon_df, dictionary)
 
     def _generate_lda_c_from_dataframe(self):
+        """
+        Convert a dataframe into LDA-C and save it to disk. The dataframe is
+        meant to be Amazon's labelled plain data loaded from a gzip file. An
+        additional column will be added to hold the BoW representation too.
+
+        Returns
+        -------
+        amazon_df : pd.DataFrame
+            A dataframe holding the plain documents and the BoW representation,
+            alongside authors (labels)
+
+        """
+
         amazon_df, id2word_map = self._convert_series_to_bow()
         # Sterialise it to disk as LDA-C
         output_dir = r"{}\lda_c_format".format(self.input_amazon_path)
@@ -140,7 +164,7 @@ class LssModeller:
         param_directory = r"{}\{}".format(self.input_docs_path,
                                           self.hdp_output_directory)
         # Prepare the output directory
-        self._initialise_directory(param_directory)
+        DiskTools.initialise_directory(param_directory)
 
         ret = s.run([path_executable,
                      "--algorithm",     "train",
@@ -173,7 +197,7 @@ class LssModeller:
 
         return ret.stdout
 
-    def _infer_lss_representation(self, param_num_iter="25") -> list:
+    def _infer_lss_representation(self) -> list:
         """
         Produce an LSS representation of text files and save it to disk
 
@@ -185,18 +209,19 @@ class LssModeller:
         """
 
         # Make the text files into an LDA-C corpus and return a copy of them
-        plain_docs = self._generate_lda_c_corpus()
+        plain_docs, bow_rep = self._generate_lda_c_corpus()
         # Run Gibbs HDP on the LDA-C corpus
-        print("\n> Starting HDP with {} iterations...".format(param_num_iter))
+        print("\n> Starting HDP with {} iterations...".format(
+                self.hdp_iterations))
         t = time.perf_counter()
-        output_hdp = self._invoke_gibbs_hdp(param_num_iter=param_num_iter)
+        output_hdp = self._invoke_gibbs_hdp()
         nt = time.perf_counter()
         print("************************************************************\n")
         print(("HDP executed in {x:0.2f} seconds "
               "and yielded the message:\n{y}"
                ).format(x=nt-t, y=output_hdp))
         print("**************************************************************")
-        return plain_docs
+        return plain_docs, bow_rep
 
     def _infer_amazon_lss_representation(self) -> list:
         """
@@ -290,23 +315,44 @@ class LssModeller:
         if infer_lss:
             bow_df = self._infer_amazon_lss_representation()
         else:
-            bow_df = self._convert_series_to_bow()
+            bow_df,_ = self._convert_series_to_bow()
 
         return bow_df, self._load_amazon_lss_representation_into_df()
+
+    def get_corpus_lss(self, infer_lss) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Get high- and low-dimenstional representation of data
+
+        Parameters
+        ----------
+        infer_lss: bool, optional
+            If `True`, hdp will be run again to generate the LSS representation
+            on disk. `False` means the representation was already generated and
+            can be loaded from disk.
+
+        """
+
+        if infer_lss:
+            plain, bow_df = self._infer_lss_representation()
+        else:
+            bow_df, _, plain = self._convert_corpus_to_bow()
+
+        return plain, bow_df, self._load_amazon_lss_representation_into_df()
 
 
 def main():
     print("Main thread started..\n")
     Modeller = LssModeller(
             hdp_path=r"..\..\hdps\hdp",
-            input_docs_path=r"..\data\toy_corpus",
+            input_docs_path=r"..\..\..\Datasets\pan17_train\problem001",
             input_amazon_path=r"..\..\..\Datasets\Amazon",
             input_amazon_fname=r"reviews_Automotive_5.json.gz",
             ldac_filename=r"dummy_ldac_corpus",
             hdp_output_dir=r"hdp_lss",
-            hdp_iters=10)
+            hdp_iters=1000,
+            word_grams=3)
 
-    Modeller.get_amazon_lss(infer_lss=True)
+#    plain, lss = Modeller.get_corpus_lss(infer_lss=True)
 
 
 if __name__ == "__main__":
