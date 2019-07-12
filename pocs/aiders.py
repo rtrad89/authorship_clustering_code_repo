@@ -8,6 +8,7 @@ import os
 from shutil import rmtree
 import pandas as pd
 import gzip
+import json
 
 
 class DiskTools:
@@ -34,8 +35,62 @@ class DiskTools:
                 rmtree(dir_path)
             os.mkdir(dir_path)
         except PermissionError:
-            print("> ERROR: Please make sure the {} folder"
-                  "is not used by some process").format(dir_path)
+            print("ERROR: Please make sure the folders required by the program"
+                  "are not already opened")
+
+    @staticmethod
+    def get_filename(path) -> str:
+        return os.path.basename(path)
+
+    @staticmethod
+    def _read_json_file(path) -> object:
+        with open(path, mode='r', encoding='utf8') as json_file:
+            json_data = json_file.read()
+        return json.loads(json_data)
+
+    @staticmethod
+    def load_true_clusters_into_df(path) -> pd.DataFrame:
+        # Read json file contents
+        json_content = DiskTools._read_json_file(path=path)
+
+        # The data is read as a list of list of dictionaries
+        # Transofrming it to an indexed series with labels for compatability
+        ground_truth = {}
+        for idx in range(0, len(json_content)):
+            ground_truth.update(
+                    {idx: [list(x.values()).pop() for x in json_content[idx]]}
+                    )
+
+        return pd.DataFrame(data=[ground_truth],
+                            index=["clusters"]).transpose()
+
+    @staticmethod
+    def load_true_clusters_into_vector(path) -> pd.Series:
+        """
+        Load the true clustering json file into a series indexed by file names.
+
+        Returns
+        -------
+        vec : pd.Series
+            Cluster labels of the documents in a series whose index is the
+            names of the files and values are the lables.
+
+        """
+        # Read the json file
+        json_contents = DiskTools._read_json_file(path=path)
+        # Dismantle the nested dictionaries
+        temp_list = []
+        for idx in range(0, len(json_contents)):
+            temp_list.append(
+                    [list(clus.values()).pop() for clus in json_contents[idx]])
+        # Reshape the list as a series indexed with file names
+        temp_dict = {}
+        for idx in range(0, len(temp_list)):
+            for name in temp_list[idx]:
+                temp_dict.update({name: idx})
+
+        vec = pd.Series(temp_dict, name="true")
+        return vec
 
 
 class AmazonParser:

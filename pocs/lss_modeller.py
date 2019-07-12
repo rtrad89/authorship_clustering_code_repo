@@ -2,6 +2,7 @@
 """
 
 """
+from __future__ import annotations  # To defer evaluation of type hints
 import subprocess as s
 import os
 from gensim.corpora import Dictionary, bleicorpus
@@ -18,10 +19,16 @@ class LssModeller:
     """A class that handles the representation of documents in a reduced LSS"""
 
     # Constructor
-    def __init__(self, hdp_path: str, input_docs_path: str,
-                 input_amazon_path: str, input_amazon_fname: str,
-                 ldac_filename: str, hdp_output_dir: str, hdp_iters: int,
-                 word_grams: int):
+    def __init__(self,
+                 hdp_path: str,
+                 ldac_filename: str,
+                 hdp_output_dir: str,
+                 hdp_iters: int,
+                 hdp_seed: float,
+                 word_grams: int,
+                 input_docs_path: str = None,
+                 input_amazon_path: str = None,
+                 input_amazon_fname: str = None):
         """Default Constructor
 
         Parameters
@@ -41,7 +48,9 @@ class LssModeller:
         self.lda_c_fname = ldac_filename
         self.hdp_output_directory = hdp_output_dir
         self.hdp_iterations = hdp_iters
+        self.hdp_rand_seed = hdp_seed
         self.word_grams = word_grams
+        self.doc_index = []  # the index of the files read for reference
 
     def _convert_corpus_to_bow(self):
         """
@@ -71,9 +80,11 @@ class LssModeller:
                 try:
                     f = open(doc.path, mode="r", encoding="utf8")
                     plain_documents.append(f.read())
+                    self.doc_index.append(DiskTools.get_filename(doc.path))
                 except PermissionError:
                     # Raised when trying to open a directory
-                    print("Directory {} skipped".format(doc.path))
+                    print("Skipping directory while loading files: {}"
+                          .format(doc.name))
                     pass
         # Collocation Detection can be applied here via gensim.models.phrases
         # Tokenise corpus and remove too short documents
@@ -85,7 +96,10 @@ class LssModeller:
         # Form the word ids dictionary for vectorisation
         dictionary = Dictionary(tokenised_corpus)
         bow_corpus = [dictionary.doc2bow(t_d) for t_d in tokenised_corpus]
-        return(bow_corpus, dictionary, plain_documents)
+        return(bow_corpus,
+               dictionary,
+               pd.DataFrame(data=plain_documents, index=self.doc_index,
+                            columns=["content"]))
 
     def _generate_lda_c_corpus(self):
         """ Convert a group of files LDA_C corpus and store it on disk"""
@@ -171,6 +185,7 @@ class LssModeller:
                      "--data",          param_data,
                      "--directory",     param_directory,
                      "--max_iter",      str(self.hdp_iterations),
+                     "--random_seed",   str(self.hdp_rand_seed),
                      "--save_lag",      "-1"],
                     check=True, capture_output=True, text=True)
 
@@ -192,6 +207,7 @@ class LssModeller:
                      "--data",          param_data,
                      "--directory",     param_directory,
                      "--max_iter",      str(self.hdp_iterations),
+                     "--random_seed",   str(self.hdp_rand_seed),
                      "--save_lag",      "-1"],
                     check=True, capture_output=True, text=True)
 
@@ -214,12 +230,11 @@ class LssModeller:
         print("\n> Starting HDP with {} iterations...".format(
                 self.hdp_iterations))
         t = time.perf_counter()
-        output_hdp = self._invoke_gibbs_hdp()
+        self._invoke_gibbs_hdp()  # To capture the output of hdp, assign a var
         nt = time.perf_counter()
-        print("************************************************************\n")
-        print(("HDP executed in {x:0.2f} seconds "
-              "and yielded the message:\n{y}"
-               ).format(x=nt-t, y=output_hdp))
+        print("************************************************************")
+        print(("HDP executed in {x:0.2f} seconds"
+               ).format(x=nt-t))
         print("**************************************************************")
         return plain_docs, bow_rep
 
@@ -240,12 +255,11 @@ class LssModeller:
         print("\n> Starting HDP with {} iterations...".format(
                 self.hdp_iterations))
         t = time.perf_counter()
-        output_hdp = self._invoke_gibbs_hdp_amazon()
+        self._invoke_gibbs_hdp_amazon()
         nt = time.perf_counter()
         print("************************************************************\n")
-        print(("HDP executed in {x:0.2f} seconds "
-              "and yielded the message:\n{y}"
-               ).format(x=nt-t, y=output_hdp))
+        print(("HDP executed in {x:0.2f} seconds"
+               ).format(x=nt-t))
         print("**************************************************************")
         return amazon_df
 
@@ -272,6 +286,9 @@ class LssModeller:
         lss_df = lss_df.pivot_table(
                 values='w', columns='z', index='d',
                 aggfunc='count', fill_value=0)
+        # Index with file names for later reference
+        lss_df.index = self.doc_index
+
         return lss_df
 
     def _load_amazon_lss_representation_into_df(self) -> pd.DataFrame:
@@ -315,7 +332,7 @@ class LssModeller:
         if infer_lss:
             bow_df = self._infer_amazon_lss_representation()
         else:
-            bow_df,_ = self._convert_series_to_bow()
+            bow_df, _ = self._convert_series_to_bow()
 
         return bow_df, self._load_amazon_lss_representation_into_df()
 
@@ -337,7 +354,7 @@ class LssModeller:
         else:
             bow_df, _, plain = self._convert_corpus_to_bow()
 
-        return plain, bow_df, self._load_amazon_lss_representation_into_df()
+        return plain, bow_df, self._load_lss_representation_into_df()
 
 
 def main():
@@ -350,9 +367,9 @@ def main():
             ldac_filename=r"dummy_ldac_corpus",
             hdp_output_dir=r"hdp_lss",
             hdp_iters=1000,
-            word_grams=3)
+            word_grams=1)
 
-#    plain, lss = Modeller.get_corpus_lss(infer_lss=True)
+#    plain, bow, lss = Modeller.get_corpus_lss(infer_lss=True)
 
 
 if __name__ == "__main__":
