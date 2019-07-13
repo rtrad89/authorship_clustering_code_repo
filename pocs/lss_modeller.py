@@ -15,7 +15,7 @@ from aiders import AmazonParser, DiskTools
 from typing import Tuple  # , overload
 
 
-class LssModeller:
+class LssHdpModeller:
     """A class that handles the representation of documents in a reduced LSS"""
 
     # Constructor
@@ -359,7 +359,7 @@ class LssModeller:
 
 def main():
     print("Main thread started..\n")
-    Modeller = LssModeller(
+    Modeller = LssHdpModeller(
             hdp_path=r"..\..\hdps\hdp",
             input_docs_path=r"..\..\..\Datasets\pan17_train\problem001",
             input_amazon_path=r"..\..\..\Datasets\Amazon",
