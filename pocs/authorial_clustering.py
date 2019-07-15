@@ -4,11 +4,12 @@ Created on Fri Jul 12 02:36:07 2019
 
 @author: RTRAD
 """
+from pandas import DataFrame
 from lss_modeller import LssHdpModeller
 from clustering import Clusterer
 from aiders import DiskTools
-import pandas as pd
 from sklearn.preprocessing import normalize
+from pprint import pprint
 
 
 # Define an LSS modeller to represent documents in LSS non-sparse space
@@ -32,33 +33,23 @@ plain_docs, bow_rep_docs, lss_rep_docs = Modeller.get_corpus_lss(False)
 true_labels_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
                     r"\pan17_train\truth\problem0{}\clustering.json"
                     ).format(problem_nbr)
+
 ground_truth = DiskTools.load_true_clusters_into_vector(true_labels_path)
 
 clu_lss = Clusterer(dtm=lss_rep_docs,
-                    label_vec=None,
+                    true_labels=ground_truth,
                     max_nbr_clusters=len(lss_rep_docs)//2,
                     min_nbr_clusters=1,
                     min_cluster_size=2,
                     metric="cosine")
 
-clu_norm_lss = Clusterer(dtm=normalize(lss_rep_docs),
-                         label_vec=None,
-                         max_nbr_clusters=len(lss_rep_docs)//2,
-                         min_nbr_clusters=1,
-                         min_cluster_size=2,
-                         metric="cosine")
+pred, evals = clu_lss.eval_cluster_dbscan(epsilon=0.1, min_pts=2)
+print("\nResults:")
+pprint(evals)
+print("**********************************\n")
 
-hdbscan_clusters = clu_lss.cluster_hdbscan()
-# Juxtapose the predicted and true results
-predicted = pd.Series(index=Modeller.doc_index, data=hdbscan_clusters,
-                      name="pred")
-compare = pd.concat([ground_truth, predicted], axis=1, sort=False)
-print(compare)
-
-xmeans_clusters = clu_lss.cluster_xmeans()
-print(xmeans_clusters)
-
-dbscan_clusters = clu_lss.cluster_dbscan(epsilon=0.1, min_pts=3)
-print(dbscan_clusters)
-
-# Normalised clusterings go here
+# Experiment with normalised data
+clu_lss.set_data(DataFrame(normalize(lss_rep_docs)))
+norm_pred, norm_evals = clu_lss.eval_cluster_dbscan(epsilon=0.1, min_pts=2)
+print("\nResults on Normalised")
+pprint(norm_evals)

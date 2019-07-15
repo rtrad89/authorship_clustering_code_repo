@@ -5,21 +5,25 @@ Created on Tue Jul  9 19:25:40 2019
 @author: RTRAD
 """
 from sklearn.cluster import DBSCAN, OPTICS
-from sklearn import metrics
 import hdbscan
 from pyclustering.cluster.xmeans import xmeans
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
 from sklearn.metrics.cluster import (adjusted_mutual_info_score,
-                                     adjusted_rand_score)
+                                     adjusted_rand_score,
+                                     v_measure_score,
+                                     fowlkes_mallows_score,
+                                     normalized_mutual_info_score)
 from typing import List
 from numpy import place
+import pandas as pd
+import bcubed
 
 
 class Clusterer:
 
     def __init__(self,
                  dtm: List[List],
-                 label_vec: List,
+                 true_labels: pd.Series,
                  min_cluster_size: int,
                  max_nbr_clusters: int,
                  min_nbr_clusters: int,
@@ -34,13 +38,23 @@ class Clusterer:
             in a feature array.It must be one of the options allowed by
             sklearn.metrics.pairwise_distances for its metric parameter.
         """
+        if isinstance(dtm, pd.DataFrame):
+            self.data = dtm
+            self.true_labels = true_labels
+            self.min_clu_size = min_cluster_size
+            self.min_clusters = min_nbr_clusters
+            self.max_clusters = max_nbr_clusters
+            self.distance_metric = metric
+        else:
+            print("\nERROR: cannot create class.\n"
+                  "Data must be passed as a dataframe or similar structure.\n")
 
-        self.data = dtm
-        self.labels_vec = label_vec
-        self.min_clu_size = min_cluster_size
-        self.min_clusters = min_nbr_clusters
-        self.max_clusters = max_nbr_clusters
-        self.distance_metric = metric
+    def set_data(self, data):
+        if isinstance(data, pd.DataFrame):
+            self.data = data
+        else:
+            print("\nERROR while setting new data!\n"
+                  "Data must be passed as a dataframe or similar structure.\n")
 
     def _process_noise_as_singletons(self, result: List):
 
@@ -50,20 +64,20 @@ class Clusterer:
 
         return result
 
-    def cluster_dbscan(self, epsilon: float, min_pts: int):
+    def _cluster_dbscan(self, epsilon: float, min_pts: int):
         labels = DBSCAN(eps=epsilon, min_samples=min_pts,
                         metric=self.distance_metric, n_jobs=-1
                         ).fit_predict(self.data)
 
         return self._process_noise_as_singletons(labels)
 
-    def cluster_optics(self):
+    def _cluster_optics(self):
         """
         https://scikit-learn.org/stable/auto_examples/cluster/plot_optics.html#sphx-glr-auto-examples-cluster-plot-optics-py
         """
         pass
 
-    def cluster_hdbscan(self):
+    def _cluster_hdbscan(self):
         """
         Perform density based hierarchical DBSCAN
 
@@ -85,7 +99,7 @@ class Clusterer:
 
         return self._process_noise_as_singletons(result=result)
 
-    def cluster_xmeans(self) -> list:
+    def _cluster_xmeans(self) -> list:
         """
         Perform partitional centroid-based x-means
 
@@ -105,28 +119,46 @@ class Clusterer:
         # Extract the clusters and return them
         return xmeans_instance.get_clusters()
 
-    def adjusted_mutual_info_eval(self, clustering: list):
-        """
-        Computes the AMI score
+    def eval_clustering(self, labels_true, labels_predicted):
+        nmi = normalized_mutual_info_score(labels_true,
+                                           labels_predicted,
+                                           average_method="max")
 
-        .. _Documentation:
-            https://scikit-learn.org/stable/modules/clustering.html
+        ami = adjusted_mutual_info_score(labels_true,
+                                         labels_predicted,
+                                         average_method="arithmetic")
 
-        """
+        ari = adjusted_rand_score(labels_true,
+                                  labels_predicted)
 
-        return adjusted_mutual_info_score(self.labels_vec,
-                                          clustering)
+        v_measure = v_measure_score(labels_true,
+                                    labels_predicted,
+                                    beta=1.0)
 
-    def adjusted_rand_index_eval(self, clustering: list):
-        """
-        Computes the ARI score
+        fms = fowlkes_mallows_score(labels_true,
+                                    labels_predicted)
 
-        .. _Documentation:
-            https://scikit-learn.org/stable/modules/clustering.html
+        ret = {}
+        ret.update({"nmi": nmi,
+                    "ami": ami,
+                    "ari": ari,
+                    "fms": fms,
+                    "v_measure": v_measure,
+                    "AVG": (nmi+ami+ari+fms+v_measure)/5})
 
-        """
+        return ret
 
-        return adjusted_rand_score(self.labels_vec, clustering)
+    def eval_cluster_dbscan(self, epsilon: float, min_pts: int):
+        clustering_lables = self._cluster_dbscan(epsilon=epsilon,
+                                                 min_pts=min_pts)
+        predicted = pd.Series(index=self.data.index, data=clustering_lables,
+                              name="predicted")
+        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
+                                   sort=False)
+
+        return clustering_lables, self.eval_clustering(
+                aligned_labels.true,
+                aligned_labels.predicted)
 
 
 def main():
