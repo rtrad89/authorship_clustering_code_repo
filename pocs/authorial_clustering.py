@@ -15,7 +15,7 @@ from pprint import pprint
 # Define an LSS modeller to represent documents in LSS non-sparse space
 # HDP with Gibbs sampler is being used as is from:
 #   https://github.com/blei-lab/hdp
-problem_nbr = "01"
+problem_nbr = "60"
 Modeller = LssHdpModeller(
         hdp_path=r"..\..\hdps\hdp",
         input_docs_path=r"..\..\..\Datasets\pan17_train\problem0{}".format(
@@ -27,7 +27,7 @@ Modeller = LssHdpModeller(
         word_grams=1)
 
 # Infer the BoW and LSS representations of the documents
-plain_docs, bow_rep_docs, lss_rep_docs = Modeller.get_corpus_lss(False)
+plain_docs, bow_rep_docs, lss_rep_docs = Modeller.get_corpus_lss(True)
 
 # Try an HDBSCAN clustering
 true_labels_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"

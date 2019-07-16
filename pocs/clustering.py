@@ -13,7 +13,7 @@ from sklearn.metrics.cluster import (adjusted_mutual_info_score,
                                      v_measure_score,
                                      fowlkes_mallows_score,
                                      normalized_mutual_info_score)
-from typing import List
+from typing import List, Dict, Set
 from numpy import place
 import pandas as pd
 import bcubed
@@ -119,6 +119,15 @@ class Clusterer:
         # Extract the clusters and return them
         return xmeans_instance.get_clusters()
 
+    def _reshape_labels_as_dicts(
+            self, labels: pd.Series) -> Dict[str, Set[str]]:
+        if not(isinstance(labels, pd.Series)):
+            print("Input must be a pandas series with an index.")
+            return None
+        # Convert the series to a dict of set of labels
+        return pd.Series(index=labels.index,
+                         data=[set(str(v)) for v in labels.values]).to_dict()
+
     def eval_clustering(self, labels_true, labels_predicted):
         nmi = normalized_mutual_info_score(labels_true,
                                            labels_predicted,
@@ -138,13 +147,24 @@ class Clusterer:
         fms = fowlkes_mallows_score(labels_true,
                                     labels_predicted)
 
+        # Reshape labels for BCubed measures
+        true_dict = self._reshape_labels_as_dicts(labels_true)
+        pred_dict = self._reshape_labels_as_dicts(labels_predicted)
+
+        bcubed_precision = bcubed.precision(cdict=pred_dict, ldict=true_dict)
+        bcubed_recall = bcubed.recall(cdict=pred_dict, ldict=true_dict)
+        bcubed_f1 = bcubed.fscore(bcubed_precision, bcubed_recall)
+
         ret = {}
         ret.update({"nmi": nmi,
                     "ami": ami,
                     "ari": ari,
                     "fms": fms,
                     "v_measure": v_measure,
-                    "AVG": (nmi+ami+ari+fms+v_measure)/5})
+                    "bcubed_precision": bcubed_precision,
+                    "bcubed_recall": bcubed_recall,
+                    "bcubed_fscore": bcubed_f1,
+                    "AVG": (nmi+ami+ari+fms+v_measure+bcubed_f1)/6})
 
         return ret
 
