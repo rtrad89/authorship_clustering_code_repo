@@ -15,7 +15,7 @@ from pprint import pprint
 # Define an LSS modeller to represent documents in LSS non-sparse space
 # HDP with Gibbs sampler is being used as is from:
 #   https://github.com/blei-lab/hdp
-problem_nbr = "60"
+problem_nbr = "01"
 Modeller = LssHdpModeller(
         hdp_path=r"..\..\hdps\hdp",
         input_docs_path=r"..\..\..\Datasets\pan17_train\problem0{}".format(
@@ -27,7 +27,7 @@ Modeller = LssHdpModeller(
         word_grams=1)
 
 # Infer the BoW and LSS representations of the documents
-plain_docs, bow_rep_docs, lss_rep_docs = Modeller.get_corpus_lss(True)
+plain_docs, bow_rep_docs, lss_rep_docs = Modeller.get_corpus_lss(False)
 
 # Try an HDBSCAN clustering
 true_labels_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
@@ -43,13 +43,22 @@ clu_lss = Clusterer(dtm=lss_rep_docs,
                     min_cluster_size=2,
                     metric="cosine")
 
-pred, evals = clu_lss.eval_cluster_dbscan(epsilon=0.1, min_pts=2)
-print("\nResults:")
+pred, evals = clu_lss.eval_cluster_dbscan(epsilon=0.05, min_pts=2)
+print("\n> DBSCAN Results:")
 pprint(evals)
-print("**********************************\n")
+
+print("\n**********************************")
+print("▬▬▬▬▬▬▬▬NORMALISED RESULTS▬▬▬▬▬▬▬▬\n")
+print("**********************************")
 
 # Experiment with normalised data
-clu_lss.set_data(DataFrame(normalize(lss_rep_docs)))
-norm_pred, norm_evals = clu_lss.eval_cluster_dbscan(epsilon=0.1, min_pts=2)
-print("\nResults on Normalised")
+# spkmeans normalises by default using the l2 norm
+npred, nevals = clu_lss.eval_cluster_sphirical_kmeans(k=None)
+print("\n> Sphirical K-Means Results:")
+pprint(nevals)
+# Normalise the data for other algorithms
+clu_lss.set_data(DataFrame(normalize(lss_rep_docs, norm="l2")))
+norm_pred, norm_evals = clu_lss.eval_cluster_dbscan(epsilon=0.05, min_pts=2)
+print("\n> DBSCAN Results")
 pprint(norm_evals)
+

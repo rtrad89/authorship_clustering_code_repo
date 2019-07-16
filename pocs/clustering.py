@@ -4,7 +4,7 @@ Created on Tue Jul  9 19:25:40 2019
 
 @author: RTRAD
 """
-from sklearn.cluster import DBSCAN, OPTICS
+from sklearn.cluster import DBSCAN
 import hdbscan
 from pyclustering.cluster.xmeans import xmeans
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
@@ -17,6 +17,7 @@ from typing import List, Dict, Set
 from numpy import place
 import pandas as pd
 import bcubed
+from spherecluster import SphericalKMeans
 
 
 class Clusterer:
@@ -71,12 +72,6 @@ class Clusterer:
 
         return self._process_noise_as_singletons(labels)
 
-    def _cluster_optics(self):
-        """
-        https://scikit-learn.org/stable/auto_examples/cluster/plot_optics.html#sphx-glr-auto-examples-cluster-plot-optics-py
-        """
-        pass
-
     def _cluster_hdbscan(self):
         """
         Perform density based hierarchical DBSCAN
@@ -119,6 +114,23 @@ class Clusterer:
         # Extract the clusters and return them
         return xmeans_instance.get_clusters()
 
+    def _cluster_sphirical_kmeans(self, k=None):
+        """
+        Employ sphirical k-means on L2 normalised directional data points. The
+        algorithm uses cosine distances internally, and is especially suited
+        to textual high dimentional data.
+
+        """
+        # Select the best k depending on xmeans BIC model selection
+        # CAUTION: xmeans uses Eucledian distances! may be incompatible
+        if k is None:
+            k = len(self._cluster_xmeans())
+        # Pay attention that k-means++ initialiser may be using Eucledian
+        # distances still.. hence the "random" choice
+        skm = SphericalKMeans(n_clusters=k, init="random", n_init=25,
+                              n_jobs=-1, random_state=13712, normalize=True)
+        return skm.fit_predict(self.data)
+
     def _reshape_labels_as_dicts(
             self, labels: pd.Series) -> Dict[str, Set[str]]:
         if not(isinstance(labels, pd.Series)):
@@ -128,7 +140,7 @@ class Clusterer:
         return pd.Series(index=labels.index,
                          data=[set(str(v)) for v in labels.values]).to_dict()
 
-    def eval_clustering(self, labels_true, labels_predicted):
+    def _eval_clustering(self, labels_true, labels_predicted):
         nmi = normalized_mutual_info_score(labels_true,
                                            labels_predicted,
                                            average_method="max")
@@ -176,7 +188,29 @@ class Clusterer:
         aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
                                    sort=False)
 
-        return clustering_lables, self.eval_clustering(
+        return clustering_lables, self._eval_clustering(
+                aligned_labels.true,
+                aligned_labels.predicted)
+
+    def eval_cluster_hdbscan(self):
+        clustering_lables = self._cluster_hdbscan()
+        predicted = pd.Series(index=self.data.index, data=clustering_lables,
+                              name="predicted")
+        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
+                                   sort=False)
+
+        return clustering_lables, self._eval_clustering(
+                aligned_labels.true,
+                aligned_labels.predicted)
+
+    def eval_cluster_sphirical_kmeans(self, k=None):
+        clustering_lables = self._cluster_sphirical_kmeans(k)
+        predicted = pd.Series(index=self.data.index, data=clustering_lables,
+                              name="predicted")
+        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
+                                   sort=False)
+
+        return clustering_lables, self._eval_clustering(
                 aligned_labels.true,
                 aligned_labels.predicted)
 
