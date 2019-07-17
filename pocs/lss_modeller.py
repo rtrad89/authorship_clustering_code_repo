@@ -4,7 +4,6 @@
 """
 from __future__ import annotations  # To defer evaluation of type hints
 import subprocess as s
-import os
 from gensim.corpora import Dictionary, bleicorpus
 # from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
@@ -75,15 +74,17 @@ class LssHdpModeller:
         """
         # Read in the plain text files
         plain_documents = []
-        with os.scandir(self.input_docs_path) as docs:
+        with DiskTools.scan_directory(self.input_docs_path) as docs:
             for doc in docs:
+                if doc.is_dir():
+                    continue
                 try:
                     f = open(doc.path, mode="r", encoding="utf8")
                     plain_documents.append(f.read())
                     self.doc_index.append(DiskTools.get_filename(doc.path))
                 except PermissionError:
                     # Raised when trying to open a directory
-                    print("Skipping directory while loading files: {}"
+                    print("Skipped while loading files: {}"
                           .format(doc.name))
                     pass
         # Collocation Detection can be applied here via gensim.models.phrases
@@ -272,6 +273,11 @@ class LssHdpModeller:
         lss_df : pd.DataFrame
             A matrix of shape (n_samples, n_features)
 
+        Raises
+        ------
+        FileNotFoundError
+            When the LSS representation isn't found on disk.
+
         """
 
         path = r"{}\{}\mode-word-assignments.dat".format(
@@ -280,16 +286,22 @@ class LssHdpModeller:
         # We don't need document tables, so we'll skip the relative column,
         # But we do need word counts under each topic, to produce some sort
         # of a bag-of-topics model (BoT)
-        lss_df = pd.read_csv(filepath_or_buffer=path, delim_whitespace=True)
-#                             usecols=["d", "w", "z"]).drop_duplicates()
-        # Produce topic weights as counts of topic words
-        lss_df = lss_df.pivot_table(
-                values='w', columns='z', index='d',
-                aggfunc='count', fill_value=0)
-        # Index with file names for later reference
-        lss_df.index = self.doc_index
+        try:
+            lss_df = pd.read_csv(filepath_or_buffer=path,
+                                 delim_whitespace=True)
+    #                             usecols=["d", "w", "z"]).drop_duplicates()
+            # Produce topic weights as counts of topic words
+            lss_df = lss_df.pivot_table(
+                    values='w', columns='z', index='d',
+                    aggfunc='count', fill_value=0)
+            # Index with file names for later reference
+            lss_df.index = self.doc_index
 
-        return lss_df
+            return lss_df
+        except FileNotFoundError:
+            print(("\nNo LSS precomputed file was found on disk via:\n{}\n"
+                  "> Please run HDP first...\n").format(path))
+            raise
 
     def _load_amazon_lss_representation_into_df(self) -> pd.DataFrame:
         """
@@ -336,9 +348,10 @@ class LssHdpModeller:
 
         return bow_df, self._load_amazon_lss_representation_into_df()
 
-    def get_corpus_lss(self, infer_lss) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def get_corpus_lss(self, infer_lss=True
+                       ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
-        Get high- and low-dimenstional representation of data
+        Get high- and low-dimenstional representations of data.
 
         Parameters
         ----------
@@ -346,6 +359,21 @@ class LssHdpModeller:
             If `True`, hdp will be run again to generate the LSS representation
             on disk. `False` means the representation was already generated and
             can be loaded from disk.
+
+        Returns
+        -------
+        plain : DataFrame
+            The plain documents which were processed.
+        bow_df : DataFrame
+            BoW representation of documents.
+        DataFrame
+            The LSS representation of the documents.
+
+        Raises
+        ------
+        FileNotFoundError
+            Raised when infer_lss = False and there is no precomputed LSS
+            representation on disk.
 
         """
 
@@ -366,9 +394,10 @@ def main():
             input_amazon_fname=r"reviews_Automotive_5.json.gz",
             ldac_filename=r"dummy_ldac_corpus",
             hdp_output_dir=r"hdp_lss",
+            hdp_seed=13712,
             hdp_iters=1000,
             word_grams=1)
-
+    exit(0)
 #    plain, bow, lss = Modeller.get_corpus_lss(infer_lss=True)
 
 

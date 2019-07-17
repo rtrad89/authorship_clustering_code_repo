@@ -4,7 +4,7 @@ Created on Tue Jul  9 19:25:40 2019
 
 @author: RTRAD
 """
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, MeanShift, AgglomerativeClustering
 import hdbscan
 from pyclustering.cluster.xmeans import xmeans
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
@@ -114,9 +114,9 @@ class Clusterer:
         # Extract the clusters and return them
         return xmeans_instance.get_clusters()
 
-    def _cluster_sphirical_kmeans(self, k=None):
+    def _cluster_spherical_kmeans(self, k=None):
         """
-        Employ sphirical k-means on L2 normalised directional data points. The
+        Employ spherical k-means on L2 normalised directional data points. The
         algorithm uses cosine distances internally, and is especially suited
         to textual high dimentional data.
 
@@ -203,8 +203,8 @@ class Clusterer:
                 aligned_labels.true,
                 aligned_labels.predicted)
 
-    def eval_cluster_sphirical_kmeans(self, k=None):
-        clustering_lables = self._cluster_sphirical_kmeans(k)
+    def eval_cluster_spherical_kmeans(self, k=None):
+        clustering_lables = self._cluster_spherical_kmeans(k)
         predicted = pd.Series(index=self.data.index, data=clustering_lables,
                               name="predicted")
         aligned_labels = pd.concat([self.true_labels, predicted], axis=1,

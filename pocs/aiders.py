@@ -65,6 +65,14 @@ class DiskTools:
                             index=["clusters"]).transpose()
 
     @staticmethod
+    def scan_directory(path):
+        return os.scandir(path)
+
+    @staticmethod
+    def path_exists(path):
+        return os.path.exists(path)
+
+    @staticmethod
     def load_true_clusters_into_vector(path) -> pd.Series:
         """
         Load the true clustering json file into a series indexed by file names.
