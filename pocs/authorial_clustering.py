@@ -10,8 +10,9 @@ from clustering import Clusterer
 from aiders import DiskTools
 from sklearn.preprocessing import normalize
 from pprint import pprint
-from sklearn.feature_selection import VarianceThreshold
-
+#from sklearn.feature_selection import VarianceThreshold
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
 
 # Define an LSS modeller to represent documents in LSS non-sparse space
 # HDP with Gibbs sampler is being used as is from:
@@ -29,8 +30,16 @@ Modeller = LssHdpModeller(
 
 # Infer the BoW and LSS representations of the documents
 try:
+    # Load, project and visualise the data
     plain_docs, bow_rep_docs, lss_rep_docs = Modeller.get_corpus_lss(False)
-    # Try an HDBSCAN clustering
+    embedded_docs = TSNE(perplexity=5, n_iter=5000,
+                         random_state=13712, metric="cosine"
+                         ).fit_transform(lss_rep_docs)
+    plt.scatter(embedded_docs[:, 0], embedded_docs[:, 1])
+    plt.show()
+    plt.close()
+
+    # Begin Clustering Attempts
     true_labels_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
                         r"\pan17_train\truth\problem0{}\clustering.json"
                         ).format(problem_nbr)
@@ -45,42 +54,72 @@ try:
                         metric="cosine")
 
     pred, evals = clu_lss.eval_cluster_dbscan(epsilon=0.05, min_pts=2)
+    h_pred, h_evals = clu_lss.eval_cluster_hdbscan()
+    ms_pred, ms_evals = clu_lss.eval_cluster_mean_shift()
+    xm_pred, xm_evals = clu_lss.eval_cluster_xmeans()
+
     print("\n> DBSCAN Results:")
     pprint(evals)
 
+    print("\n> HDBSCAN Results:")
+    pprint(h_evals)
+
+    print("\n> Mean Shift Results:")
+    pprint(ms_evals)
+
+    print("\n> X-Means Results:")
+    pprint(xm_evals)
+
     print("\n**********************************")
     print("▬▬▬▬▬▬▬▬NORMALISED RESULTS▬▬▬▬▬▬▬▬\n")
-    print("**********************************")
+    print("************************************")
 
     # Experiment with normalised data
     # spkmeans normalises by default using the l2 norm
-    npred, nevals = clu_lss.eval_cluster_spherical_kmeans(k=None)
+    norm_spk_pred, norm_spk_evals = clu_lss.eval_cluster_spherical_kmeans(
+            k=None)
     print("\n> Sphirical K-Means Results:")
-    pprint(nevals)
+    pprint(norm_spk_evals)
+
     # Normalise the data for other algorithms
     clu_lss.set_data(DataFrame(normalize(lss_rep_docs, norm="l2")))
+
     norm_pred, norm_evals = clu_lss.eval_cluster_dbscan(
             epsilon=0.05, min_pts=2)
+    norm_h_pred, norm_h_evals = clu_lss.eval_cluster_hdbscan()
+    norm_ms_pred, norm_ms_evals = clu_lss.eval_cluster_mean_shift()
+    norm_xm_pred, norm_xm_evals = clu_lss.eval_cluster_xmeans()
+
     print("\n> DBSCAN Results")
     pprint(norm_evals)
 
-    print("\n*****************************************")
-    print("▬▬▬▬▬▬▬▬FS Non-Normalised RESULTS▬▬▬▬▬▬▬▬\n")
-    print("*******************************************")
-    fs_lss_df = DataFrame(VarianceThreshold(threshold=25
-                                            ).fit_transform(lss_rep_docs))
-    clu_lss.set_data(fs_lss_df)
-    # Experiment with FS data
-    # spkmeans normalises by default using the l2 norm
-    fs_npred, fs_nevals = clu_lss.eval_cluster_spherical_kmeans(k=None)
-    print("\n> Sphirical K-Means Results:")
-    pprint(fs_nevals)
+    print("\n> HDBSCAN Results:")
+    pprint(norm_h_evals)
 
-    fs_pred, fs_evals = clu_lss.eval_cluster_dbscan(
-            epsilon=0.05, min_pts=2)
-    print("\n> DBSCAN Results")
-    pprint(fs_evals)
+    print("\n> Mean Shift Results:")
+    pprint(norm_ms_evals)
+
+    print("\n> X-Means Results:")
+    pprint(norm_xm_evals)
+
+# =============================================================================
+#     print("\n*******************************************************")
+#     print("▬▬▬▬▬▬▬▬Feature Selected Non-Normalised RESULTS▬▬▬▬▬▬▬▬\n")
+#     print("*********************************************************")
+#     fs_lss_df = DataFrame(VarianceThreshold(threshold=25
+#                                             ).fit_transform(lss_rep_docs))
+#     clu_lss.set_data(fs_lss_df)
+#     # Experiment with FS data
+#     # spkmeans normalises by default using the l2 norm
+#     fs_npred, fs_nevals = clu_lss.eval_cluster_spherical_kmeans(k=6)
+#     print("\n> Sphirical K-Means Results:")
+#     pprint(fs_nevals)
+#
+#     fs_pred, fs_evals = clu_lss.eval_cluster_dbscan(
+#             epsilon=0.05, min_pts=2)
+#     print("\n> DBSCAN Results")
+#     pprint(fs_evals)
+# =============================================================================
 
 except FileNotFoundError:
     print("Please run HDP on this data first.")
-

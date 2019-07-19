@@ -14,11 +14,10 @@ from sklearn.metrics.cluster import (adjusted_mutual_info_score,
                                      fowlkes_mallows_score,
                                      normalized_mutual_info_score)
 from typing import List, Dict, Set
-from numpy import place
+from numpy import place, column_stack
 import pandas as pd
 import bcubed
 from spherecluster import SphericalKMeans
-
 
 class Clusterer:
 
@@ -72,6 +71,9 @@ class Clusterer:
 
         return self._process_noise_as_singletons(labels)
 
+    def _cluster_mean_shift(self):
+        return MeanShift().fit_predict(self.data)
+
     def _cluster_hdbscan(self):
         """
         Perform density based hierarchical DBSCAN
@@ -86,13 +88,33 @@ class Clusterer:
             https://github.com/scikit-learn-contrib/hdbscan
 
         """
-
-        clusterer = hdbscan.HDBSCAN(min_cluster_size=self.min_clu_size)
+        # Initialise HDBSCAN, using generic algorithms to allow for cosine
+        # distances (due to technical incompatability with sklearn). Also the
+        # min_samples is set to 1 because we want to declare as few points to
+        # be noise as possible
+        clusterer = hdbscan.HDBSCAN(min_cluster_size=self.min_clu_size,
+                                    metric=self.distance_metric,
+                                    min_samples=1,
+                                    algorithm="generic")
         result = clusterer.fit_predict(self.data)
         # Since HDBSCAN discards noisy docs, we will convert them into
         # singleton clusters
 
         return self._process_noise_as_singletons(result=result)
+
+    def _process_xmeans_output(self, clustering: List[List]) -> list:
+        """Convert the list of lists that xmeans output to a indexed list"""
+        vals = [d for sublist in clustering for d in sublist]
+        keys = [item for sublist in
+                [[i]*len(clustering[i]) for i, _ in enumerate(clustering)]
+                for item in sublist]
+        # Stack them as columns
+        c = column_stack((keys, vals))
+        # Sort data by documents' indices, so that the labels correspond to th-
+        # em in order
+        c = c[c[:, 1].argsort(kind="mergesort")]
+        # Return the sorted labels
+        return c[:, 0]
 
     def _cluster_xmeans(self) -> list:
         """
@@ -107,12 +129,13 @@ class Clusterer:
         initial_centers = kmeans_plusplus_initializer(
                 self.data.to_numpy(), 2).initialize()
         # Set the maximum number of clusters to half the count of data points
-        xmeans_instance = xmeans(self.data.to_numpy(),
-                                 initial_centers, self.max_clusters)
+        xmeans_instance = xmeans(data=self.data.to_numpy(),
+                                 initial_centers=initial_centers,
+                                 kmax=self.max_clusters)
         xmeans_instance.process()
 
         # Extract the clusters and return them
-        return xmeans_instance.get_clusters()
+        return self._process_xmeans_output(xmeans_instance.get_clusters())
 
     def _cluster_spherical_kmeans(self, k=None):
         """
@@ -127,7 +150,7 @@ class Clusterer:
             k = len(self._cluster_xmeans())
         # Pay attention that k-means++ initialiser may be using Eucledian
         # distances still.. hence the "random" choice
-        skm = SphericalKMeans(n_clusters=k, init="random", n_init=25,
+        skm = SphericalKMeans(n_clusters=k, init="k-means++", n_init=25,
                               n_jobs=-1, random_state=13712, normalize=True)
         return skm.fit_predict(self.data)
 
@@ -168,15 +191,15 @@ class Clusterer:
         bcubed_f1 = bcubed.fscore(bcubed_precision, bcubed_recall)
 
         ret = {}
-        ret.update({"nmi": nmi,
-                    "ami": ami,
-                    "ari": ari,
-                    "fms": fms,
-                    "v_measure": v_measure,
-                    "bcubed_precision": bcubed_precision,
-                    "bcubed_recall": bcubed_recall,
-                    "bcubed_fscore": bcubed_f1,
-                    "AVG": (nmi+ami+ari+fms+v_measure+bcubed_f1)/6})
+        ret.update({"nmi": round(nmi, 4),
+                    "ami": round(ami, 4),
+                    "ari": round(ari, 4),
+                    "fms": round(fms, 4),
+                    "v_measure": round(v_measure, 4),
+                    "bcubed_precision": round(bcubed_precision, 4),
+                    "bcubed_recall": round(bcubed_recall, 4),
+                    "bcubed_fscore": round(bcubed_f1, 4)
+                    })
 
         return ret
 
@@ -205,6 +228,35 @@ class Clusterer:
 
     def eval_cluster_spherical_kmeans(self, k=None):
         clustering_lables = self._cluster_spherical_kmeans(k)
+        predicted = pd.Series(index=self.data.index, data=clustering_lables,
+                              name="predicted")
+        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
+                                   sort=False)
+
+        return clustering_lables, self._eval_clustering(
+                aligned_labels.true,
+                aligned_labels.predicted)
+
+    def eval_cluster_mean_shift(self):
+        clustering_lables = self._cluster_mean_shift()
+        predicted = pd.Series(index=self.data.index, data=clustering_lables,
+                              name="predicted")
+        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
+                                   sort=False)
+
+        return clustering_lables, self._eval_clustering(
+                aligned_labels.true,
+                aligned_labels.predicted)
+
+    def eval_cluster_xmeans(self):
+        """
+        Evaluate the clustering of X-Means. Although it uses Euclidean metrics
+        under the hood, if the data is L2 normalised on the sample level, i.e.
+        the samples are projected onto an n-sphere, Euclidean distances resemb-
+        le angular distances now, a close approximation of the cosine distance
+        which suits directional data more.
+        """
+        clustering_lables = self._cluster_xmeans()
         predicted = pd.Series(index=self.data.index, data=clustering_lables,
                               name="predicted")
         aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
