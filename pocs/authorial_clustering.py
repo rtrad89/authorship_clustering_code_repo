@@ -82,7 +82,7 @@ try:
     pprint(norm_spk_evals)
 
     # Normalise the data for other algorithms
-    clu_lss.set_data(DataFrame(normalize(lss_rep_docs, norm="l2")))
+    clu_lss.set_data(normalize(lss_rep_docs, norm="l2"))
 
     norm_pred, norm_evals = clu_lss.eval_cluster_dbscan(
             epsilon=0.05, min_pts=2)

@@ -14,10 +14,12 @@ from sklearn.metrics.cluster import (adjusted_mutual_info_score,
                                      fowlkes_mallows_score,
                                      normalized_mutual_info_score)
 from typing import List, Dict, Set
-from numpy import place, column_stack
+from numpy import place, column_stack, unique
 import pandas as pd
 import bcubed
 from spherecluster import SphericalKMeans
+from sklearn.preprocessing import normalize
+
 
 class Clusterer:
 
@@ -49,12 +51,14 @@ class Clusterer:
             print("\nERROR: cannot create class.\n"
                   "Data must be passed as a dataframe or similar structure.\n")
 
-    def set_data(self, data):
-        if isinstance(data, pd.DataFrame):
-            self.data = data
+    def set_data(self, new_data: List[List]):
+        if isinstance(new_data, pd.DataFrame):
+            self.data = new_data
         else:
-            print("\nERROR while setting new data!\n"
-                  "Data must be passed as a dataframe or similar structure.\n")
+            # Form a dataframe with the same index to be the replacement
+            idx = self.data.index
+            self.data = pd.DataFrame(data=new_data,
+                                     index=idx)
 
     def _process_noise_as_singletons(self, result: List):
 
@@ -145,9 +149,12 @@ class Clusterer:
 
         """
         # Select the best k depending on xmeans BIC model selection
-        # CAUTION: xmeans uses Eucledian distances! may be incompatible
+        # CAUTION: data mustn't be already normalised
         if k is None:
-            k = len(self._cluster_xmeans())
+            copy_data = self.data.copy()
+            self.set_data(pd.DataFrame(normalize(self.data, norm="l2")))
+            k = len(unique(self._cluster_xmeans()))
+            self.data = copy_data.copy()
         # Pay attention that k-means++ initialiser may be using Eucledian
         # distances still.. hence the "random" choice
         skm = SphericalKMeans(n_clusters=k, init="k-means++", n_init=25,
@@ -198,7 +205,10 @@ class Clusterer:
                     "v_measure": round(v_measure, 4),
                     "bcubed_precision": round(bcubed_precision, 4),
                     "bcubed_recall": round(bcubed_recall, 4),
-                    "bcubed_fscore": round(bcubed_f1, 4)
+                    "bcubed_fscore": round(bcubed_f1, 4),
+                    "-AVERAGE-": round(
+                            (nmi+ami+ari+fms+v_measure+bcubed_f1)/6,
+                            4)
                     })
 
         return ret
