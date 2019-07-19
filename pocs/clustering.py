@@ -12,7 +12,10 @@ from sklearn.metrics.cluster import (adjusted_mutual_info_score,
                                      adjusted_rand_score,
                                      v_measure_score,
                                      fowlkes_mallows_score,
-                                     normalized_mutual_info_score)
+                                     normalized_mutual_info_score,
+                                     silhouette_score,
+                                     calinski_harabasz_score,
+                                     davies_bouldin_score)
 from typing import List, Dict, Set
 from numpy import place, column_stack, unique
 import pandas as pd
@@ -197,6 +200,18 @@ class Clusterer:
         bcubed_recall = bcubed.recall(cdict=pred_dict, ldict=true_dict)
         bcubed_f1 = bcubed.fscore(bcubed_precision, bcubed_recall)
 
+        # =====================================================================
+        # Unsupervised Metrics
+        # =====================================================================
+        sil = silhouette_score(X=self.data,
+                               labels=labels_predicted,
+                               metric=self.distance_metric,
+                               random_state=13712)
+
+        ch = calinski_harabasz_score(X=self.data, labels=labels_predicted)
+
+        dv = davies_bouldin_score(X=self.data, labels=labels_predicted)
+
         ret = {}
         ret.update({"nmi": round(nmi, 4),
                     "ami": round(ami, 4),
@@ -206,12 +221,18 @@ class Clusterer:
                     "bcubed_precision": round(bcubed_precision, 4),
                     "bcubed_recall": round(bcubed_recall, 4),
                     "bcubed_fscore": round(bcubed_f1, 4),
-                    "-AVERAGE-": round(
+                    "> AVERAGE ↑": round(
                             (nmi+ami+ari+fms+v_measure+bcubed_f1)/6,
-                            4)
+                            4),
+                    # Here goes the unsupervised indices
                     })
+        us_ret = {}
+        us_ret.update({"Silhouette ↑": round(sil, 4),
+                       "Calinski_harabasz ↑": round(ch, 4),
+                       "Davies_Bouldin ↓": round(dv, 4)
+                       })
 
-        return ret
+        return [ret, us_ret]
 
     def eval_cluster_dbscan(self, epsilon: float, min_pts: int):
         clustering_lables = self._cluster_dbscan(epsilon=epsilon,

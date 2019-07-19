@@ -4,34 +4,38 @@ Created on Fri Jul 12 02:36:07 2019
 
 @author: RTRAD
 """
-from pandas import DataFrame
 from lss_modeller import LssHdpModeller
 from clustering import Clusterer
 from aiders import DiskTools
 from sklearn.preprocessing import normalize
 from pprint import pprint
-#from sklearn.feature_selection import VarianceThreshold
+# from sklearn.feature_selection import VarianceThreshold
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
+import warnings
+
+
+warnings.filterwarnings(action="ignore")  # Supress warning for this code file
 
 # Define an LSS modeller to represent documents in LSS non-sparse space
 # HDP with Gibbs sampler is being used as is from:
 #   https://github.com/blei-lab/hdp
-problem_nbr = "03"
+problem_nbr = "02"
 Modeller = LssHdpModeller(
         hdp_path=r"..\..\hdps\hdp",
         input_docs_path=r"..\..\..\Datasets\pan17_train\problem0{}".format(
                 problem_nbr),
         ldac_filename=r"dummy_ldac_corpus",
         hdp_output_dir=r"hdp_lss",
-        hdp_iters=10000,
+        hdp_iters=5000,
         hdp_seed=13712,
+        hdp_sample_hyper=True,
         word_grams=1)
 
 # Infer the BoW and LSS representations of the documents
 try:
     # Load, project and visualise the data
-    plain_docs, bow_rep_docs, lss_rep_docs = Modeller.get_corpus_lss(False)
+    plain_docs, bow_rep_docs, lss_rep_docs = Modeller.get_corpus_lss(True)
     embedded_docs = TSNE(perplexity=5, n_iter=5000,
                          random_state=13712, metric="cosine"
                          ).fit_transform(lss_rep_docs)

@@ -24,6 +24,7 @@ class LssHdpModeller:
                  hdp_output_dir: str,
                  hdp_iters: int,
                  hdp_seed: float,
+                 hdp_sample_hyper: bool,
                  word_grams: int,
                  input_docs_path: str = None,
                  input_amazon_path: str = None,
@@ -48,6 +49,7 @@ class LssHdpModeller:
         self.hdp_output_directory = hdp_output_dir
         self.hdp_iterations = hdp_iters
         self.hdp_rand_seed = hdp_seed
+        self.hdp_hyper_sampling = hdp_sample_hyper
         self.word_grams = word_grams
         self.doc_index = []  # the index of the files read for reference
 
@@ -187,6 +189,8 @@ class LssHdpModeller:
                      "--directory",     param_directory,
                      "--max_iter",      str(self.hdp_iterations),
                      "--random_seed",   str(self.hdp_rand_seed),
+                     "--sample_hyper",  "yes" if self.hdp_hyper_sampling
+                     else "no",
                      "--save_lag",      "-1"],
                     check=True, capture_output=True, text=True)
 
@@ -209,6 +213,8 @@ class LssHdpModeller:
                      "--directory",     param_directory,
                      "--max_iter",      str(self.hdp_iterations),
                      "--random_seed",   str(self.hdp_rand_seed),
+                     "--sample_hyper",  "yes" if self.hdp_hyper_sampling
+                     else "no",
                      "--save_lag",      "-1"],
                     check=True, capture_output=True, text=True)
 
@@ -300,7 +306,8 @@ class LssHdpModeller:
             return lss_df
         except FileNotFoundError:
             print(("\nNo LSS precomputed file was found on disk via:\n{}\n"
-                  "> Please run HDP first...\n").format(path))
+                  "> Please generate LDA-C corpus and run HDP first...\n"
+                   ).format(path))
             raise
 
     def _load_amazon_lss_representation_into_df(self) -> pd.DataFrame:
@@ -396,6 +403,7 @@ def main():
             hdp_output_dir=r"hdp_lss",
             hdp_seed=13712,
             hdp_iters=1000,
+            hdp_sample_hyper=True,
             word_grams=1)
     exit(0)
 #    plain, bow, lss = Modeller.get_corpus_lss(infer_lss=True)
