@@ -20,7 +20,7 @@ warnings.filterwarnings(action="ignore")  # Supress warning for this code file
 # Define an LSS modeller to represent documents in LSS non-sparse space
 # HDP with Gibbs sampler is being used as is from:
 #   https://github.com/blei-lab/hdp
-problem_nbr = "02"
+problem_nbr = "03"
 Modeller = LssHdpModeller(
         hdp_path=r"..\..\hdps\hdp",
         input_docs_path=r"..\..\..\Datasets\pan17_train\problem0{}".format(
@@ -35,7 +35,7 @@ Modeller = LssHdpModeller(
 # Infer the BoW and LSS representations of the documents
 try:
     # Load, project and visualise the data
-    plain_docs, bow_rep_docs, lss_rep_docs = Modeller.get_corpus_lss(True)
+    plain_docs, bow_rep_docs, lss_rep_docs = Modeller.get_corpus_lss(False)
     embedded_docs = TSNE(perplexity=5, n_iter=5000,
                          random_state=13712, metric="cosine"
                          ).fit_transform(lss_rep_docs)
@@ -55,12 +55,14 @@ try:
                         max_nbr_clusters=len(lss_rep_docs)//2,
                         min_nbr_clusters=1,
                         min_cluster_size=2,
-                        metric="cosine")
+                        metric="cosine",
+                        desired_n_clusters=None)
 
     pred, evals = clu_lss.eval_cluster_dbscan(epsilon=0.05, min_pts=2)
     h_pred, h_evals = clu_lss.eval_cluster_hdbscan()
     ms_pred, ms_evals = clu_lss.eval_cluster_mean_shift()
     xm_pred, xm_evals = clu_lss.eval_cluster_xmeans()
+    hac_pred, hac_evals = clu_lss.eval_cluster_HAC(k=7)
 
     print("\n> DBSCAN Results:")
     pprint(evals)
@@ -74,14 +76,16 @@ try:
     print("\n> X-Means Results:")
     pprint(xm_evals)
 
+    print("\n> HAC:")
+    pprint(hac_evals)
+
     print("\n**********************************")
     print("▬▬▬▬▬▬▬▬NORMALISED RESULTS▬▬▬▬▬▬▬▬\n")
     print("************************************")
 
     # Experiment with normalised data
     # spkmeans normalises by default using the l2 norm
-    norm_spk_pred, norm_spk_evals = clu_lss.eval_cluster_spherical_kmeans(
-            k=None)
+    norm_spk_pred, norm_spk_evals = clu_lss.eval_cluster_spherical_kmeans()
     print("\n> Sphirical K-Means Results:")
     pprint(norm_spk_evals)
 
@@ -93,6 +97,7 @@ try:
     norm_h_pred, norm_h_evals = clu_lss.eval_cluster_hdbscan()
     norm_ms_pred, norm_ms_evals = clu_lss.eval_cluster_mean_shift()
     norm_xm_pred, norm_xm_evals = clu_lss.eval_cluster_xmeans()
+    norm_hac_pred, norm_hac_evals = clu_lss.eval_cluster_HAC(k=7)
 
     print("\n> DBSCAN Results")
     pprint(norm_evals)
@@ -105,6 +110,9 @@ try:
 
     print("\n> X-Means Results:")
     pprint(norm_xm_evals)
+
+    print("\n> HAC:")
+    pprint(norm_hac_evals)
 
 # =============================================================================
 #     print("\n*******************************************************")

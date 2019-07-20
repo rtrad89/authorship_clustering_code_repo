@@ -32,7 +32,8 @@ class Clusterer:
                  min_cluster_size: int,
                  max_nbr_clusters: int,
                  min_nbr_clusters: int,
-                 metric: str):
+                 metric: str,
+                 desired_n_clusters: int = None):
         """
         The default constructor, encapsulating common attributes
 
@@ -50,9 +51,23 @@ class Clusterer:
             self.min_clusters = min_nbr_clusters
             self.max_clusters = max_nbr_clusters
             self.distance_metric = metric
+            if (desired_n_clusters is not None) and (
+                    desired_n_clusters < len(dtm)):
+                self.k = desired_n_clusters
+            else:
+                # Estimate k using X-Means on L2 normalised data
+                self.k = self._estimate_k()
         else:
             print("\nERROR: cannot create class.\n"
                   "Data must be passed as a dataframe or similar structure.\n")
+
+    def _estimate_k(self):
+        copy_data = self.data.copy()
+        self.set_data(pd.DataFrame(normalize(self.data, norm="l2")))
+        k = len(unique(self._cluster_xmeans()))
+        self.data = copy_data.copy()
+
+        return k
 
     def set_data(self, new_data: List[List]):
         if isinstance(new_data, pd.DataFrame):
@@ -144,25 +159,25 @@ class Clusterer:
         # Extract the clusters and return them
         return self._process_xmeans_output(xmeans_instance.get_clusters())
 
-    def _cluster_spherical_kmeans(self, k=None):
+    def _cluster_spherical_kmeans(self):
         """
         Employ spherical k-means on L2 normalised directional data points. The
         algorithm uses cosine distances internally, and is especially suited
         to textual high dimentional data.
 
         """
-        # Select the best k depending on xmeans BIC model selection
-        # CAUTION: data mustn't be already normalised
-        if k is None:
-            copy_data = self.data.copy()
-            self.set_data(pd.DataFrame(normalize(self.data, norm="l2")))
-            k = len(unique(self._cluster_xmeans()))
-            self.data = copy_data.copy()
         # Pay attention that k-means++ initialiser may be using Eucledian
         # distances still.. hence the "random" choice
-        skm = SphericalKMeans(n_clusters=k, init="k-means++", n_init=25,
+        skm = SphericalKMeans(n_clusters=self.k, init="k-means++", n_init=25,
                               n_jobs=-1, random_state=13712, normalize=True)
         return skm.fit_predict(self.data)
+
+    def _cluster_HAC(self, k: int, linkage: str = "single"):
+        if k is None:
+            # Compute the full tree and extract the best clustering
+            hac = AgglomerativeClustering(affinity=self.distance_metric,
+                                          linkage=linkage)
+        return hac.fit_predict(self.data)
 
     def _reshape_labels_as_dicts(
             self, labels: pd.Series) -> Dict[str, Set[str]]:
@@ -257,8 +272,8 @@ class Clusterer:
                 aligned_labels.true,
                 aligned_labels.predicted)
 
-    def eval_cluster_spherical_kmeans(self, k=None):
-        clustering_lables = self._cluster_spherical_kmeans(k)
+    def eval_cluster_spherical_kmeans(self):
+        clustering_lables = self._cluster_spherical_kmeans()
         predicted = pd.Series(index=self.data.index, data=clustering_lables,
                               name="predicted")
         aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
@@ -288,6 +303,27 @@ class Clusterer:
         which suits directional data more.
         """
         clustering_lables = self._cluster_xmeans()
+        predicted = pd.Series(index=self.data.index, data=clustering_lables,
+                              name="predicted")
+        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
+                                   sort=False)
+
+        return clustering_lables, self._eval_clustering(
+                aligned_labels.true,
+                aligned_labels.predicted)
+
+    def eval_cluster_HAC(self, k=None, linkage="single"):
+        """
+        Execute and evaluate HAC clustering.
+
+        Parameters
+        ----------
+        k : int
+            The number of clusters to extract. If it is not specified then the
+            X-Means BIC scheme is exploited for this.
+        """
+
+        clustering_lables = self._cluster_HAC(k=k, linkage=linkage)
         predicted = pd.Series(index=self.data.index, data=clustering_lables,
                               name="predicted")
         aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
