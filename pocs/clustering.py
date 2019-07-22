@@ -22,6 +22,8 @@ import pandas as pd
 import bcubed
 from spherecluster import SphericalKMeans
 from sklearn.preprocessing import normalize
+import scipy.cluster.hierarchy as hac
+import math
 
 
 class Clusterer:
@@ -172,12 +174,80 @@ class Clusterer:
                               n_jobs=-1, random_state=13712, normalize=True)
         return skm.fit_predict(self.data)
 
+    def _select_best_HAC(self,
+                         k_values: list,
+                         use_sil: bool = False,
+                         linkage: str = "single",
+                         verbose: bool = False):
+        """
+        Select the best cut in the HAC tree according to an unsupervised
+        clustering evaluation metric.
+
+        Parameters
+        ----------
+        k_values : list, optional
+            The range of k values to be examined.
+        use_sil: bool
+            if True, silhouette_score will be used,
+            otherwise calinski_harabasz_score is used by default.
+        linkage: str
+            The type of linkage scheme to be used in the HAC
+        """
+        results = []
+        for k in k_values:
+            hac = AgglomerativeClustering(n_clusters=k,
+                                          affinity=self.distance_metric,
+                                          linkage=linkage,
+                                          compute_full_tree=True,
+                                          memory=r"./__cache__/")
+            pred = hac.fit_predict(self.data)
+            if use_sil:
+                score = silhouette_score(X=self.data,
+                                         labels=pred,
+                                         metric=self.distance_metric,
+                                         random_state=13712)
+            else:
+                score = calinski_harabasz_score(
+                        X=self.data, labels=pred)
+
+            aic_like_score = 2*k - (2*math.log(score))
+            bic_like_score = math.log(len(self.data))*k - (2*math.log(score))
+            if verbose:
+                print((f"-► k={k:02} → score={score:.3f}"
+                      f"| aic like={aic_like_score:.3f}"
+                      f"| bic line={bic_like_score:.3f}"))
+
+            results.append([k,
+                           score,
+                           aic_like_score,
+                           pred])
+
+        return results
+
     def _cluster_HAC(self, k: int, linkage: str = "single"):
         if k is None:
-            # Compute the full tree and extract the best clustering
-            hac = AgglomerativeClustering(affinity=self.distance_metric,
+            # Compute the full tree and cache it to extract the best clustering
+            results = self._select_best_HAC(
+                    k_values=range(2, 1+len(self.data)//2),
+                    use_sil=False)
+            # The results do not seem to be useful... Terminating this path
+        else:
+            hac = AgglomerativeClustering(n_clusters=k,
+                                          affinity=self.distance_metric,
                                           linkage=linkage)
+
         return hac.fit_predict(self.data)
+
+    def _cluster_agglomerative(self, k: int, linkage: str = "single"):
+        """
+        Use SciPy implementation of HAC to avail myself of the automatice cut
+        location detection.
+        """
+        # Define the linkage scheme
+        z = hac.linkage(self.data.to_numpy(),
+                        metric="cosine",
+                        method=linkage)
+        return hac.fcluster(Z=z, t=k, criterion="maxclust")
 
     def _reshape_labels_as_dicts(
             self, labels: pd.Series) -> Dict[str, Set[str]]:
@@ -238,7 +308,7 @@ class Clusterer:
                     "bcubed_fscore": round(bcubed_f1, 4),
                     "> AVERAGE ↑": round(
                             (nmi+ami+ari+fms+v_measure+bcubed_f1)/6,
-                            4),
+                            2),
                     # Here goes the unsupervised indices
                     })
         us_ret = {}

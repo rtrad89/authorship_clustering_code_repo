@@ -13,6 +13,8 @@ from pprint import pprint
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import warnings
+from sklearn.preprocessing import MinMaxScaler
+from pandas import DataFrame
 
 
 warnings.filterwarnings(action="ignore")  # Supress warning for this code file
@@ -32,10 +34,17 @@ Modeller = LssHdpModeller(
         hdp_sample_hyper=True,
         word_grams=1)
 
+scale_features = False
 # Infer the BoW and LSS representations of the documents
 try:
     # Load, project and visualise the data
     plain_docs, bow_rep_docs, lss_rep_docs = Modeller.get_corpus_lss(False)
+    if scale_features:
+        # Scale the features to treat them equally in importance
+        lss_rep_docs = DataFrame(data=MinMaxScaler().fit(
+                X=lss_rep_docs).transform(X=lss_rep_docs),
+            index=plain_docs.index)
+    # Reduce the dimensionality for visualisation purposes
     embedded_docs = TSNE(perplexity=5, n_iter=5000,
                          random_state=13712, metric="cosine"
                          ).fit_transform(lss_rep_docs)
