@@ -1,6 +1,7 @@
 ## Byte-compiled / optimized / DLL files
 __pycache__/
 __cache__/
+__outputs__/
 *.py[cod]
 
 ## Core latex/pdflatex auxiliary files:
