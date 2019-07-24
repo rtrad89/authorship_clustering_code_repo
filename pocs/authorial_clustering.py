@@ -23,7 +23,8 @@ warnings.filterwarnings(action="ignore")  # Supress warning for this code file
 def problem_set_run(problem_set_id: int,
                     infer_lss: bool = False,
                     scale_features: bool = False,
-                    scaling_option: int = 2):
+                    scaling_option: int = 2,
+                    hyper_sampling: bool = False):
     problem_nbr = f"{problem_set_id:03d}"
     # Define an LSS modeller to represent documents in LSS non-sparse space
     # HDP with Gibbs sampler is being used as is from:
@@ -37,7 +38,7 @@ def problem_set_run(problem_set_id: int,
             hdp_output_dir=r"hdp_lss",
             hdp_iters=10000,
             hdp_seed=13712,
-            hdp_sample_hyper=False,
+            hdp_sample_hyper=hyper_sampling,
             word_grams=1)
 
     # Infer the BoW and LSS representations of the documents
@@ -63,7 +64,6 @@ def problem_set_run(problem_set_id: int,
         plt.gcf().savefig(r"./__outputs__/projection_training_{}".format(
                 problem_nbr))
         plt.show()
-
         # Begin Clustering Attempts
         true_labels_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering"
                             r"\Datasets\pan17_train\truth"
@@ -196,5 +196,13 @@ def problem_set_run(problem_set_id: int,
 
 
 if __name__ == "__main__":
-    ret = problem_set_run(1, infer_lss=False)
-    ret2 = problem_set_run(3, infer_lss=False)
+    problemsets_results = []
+    print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
+    for ps in range(1, 61):
+        print(f"Executing on problem set ► {ps:03d} ◄ ..")
+        ps_result = problem_set_run(problem_set_id=ps,
+                                    infer_lss=False)
+        problemsets_results.append(ps_result)
+        print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬(Done)▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
+    Tools.splice_save_problemsets_dictionaries(problemsets_results)
+    print("Execution finished.")

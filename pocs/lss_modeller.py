@@ -242,10 +242,10 @@ class LssHdpModeller:
         t = time.perf_counter()
         self._invoke_gibbs_hdp()  # To capture the output of hdp, assign a var
         nt = time.perf_counter()
-        print("************************************************************")
+        print("***************************************")
         print(("HDP executed in {x:0.2f} seconds"
                ).format(x=nt-t))
-        print("**************************************************************")
+        print("***************************************")
         return plain_docs, bow_rep
 
     def _infer_amazon_lss_representation(self) -> list:

@@ -298,14 +298,19 @@ class Clusterer:
         # =====================================================================
         # Unsupervised Metrics
         # =====================================================================
-        sil = silhouette_score(X=self.data,
-                               labels=labels_predicted,
-                               metric=self.distance_metric,
-                               random_state=13712)
+        if labels_predicted.nunique() != 1:
+            sil = silhouette_score(X=self.data,
+                                   labels=labels_predicted,
+                                   metric=self.distance_metric,
+                                   random_state=13712)
 
-        ch = calinski_harabasz_score(X=self.data, labels=labels_predicted)
+            ch = calinski_harabasz_score(X=self.data, labels=labels_predicted)
 
-        dv = davies_bouldin_score(X=self.data, labels=labels_predicted)
+            dv = davies_bouldin_score(X=self.data, labels=labels_predicted)
+        else:
+            sil = None
+            ch = None
+            dv = None
 
         ret = {}
         ret.update({"nmi": round(nmi, 4),
@@ -319,9 +324,12 @@ class Clusterer:
                     "AVERAGE": round(
                             (nmi+ami+ari+fms+v_measure+bcubed_f1)/6,
                             2),
-                    "Silhouette": round(sil, 4),
-                    "Calinski_harabasz": round(ch, 4),
-                    "Davies_Bouldin": round(dv, 4)
+                    "Silhouette": round(sil, 4
+                                        ) if sil is not None else None,
+                    "Calinski_harabasz": round(ch, 4
+                                               ) if ch is not None else None,
+                    "Davies_Bouldin": round(dv, 4
+                                            ) if dv is not None else None
                     # Here goes the unsupervised indices
                     })
 
