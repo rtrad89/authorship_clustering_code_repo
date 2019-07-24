@@ -10,7 +10,7 @@ from nltk.tokenize import word_tokenize
 from nltk.util import ngrams
 import time
 import pandas as pd
-from aiders import AmazonParser, DiskTools
+from aiders import AmazonParser, Tools
 from typing import Tuple  # , overload
 
 
@@ -46,7 +46,7 @@ class LssHdpModeller:
         self.input_amazon_path = input_amazon_path
         self.input_amazon_filename = input_amazon_fname
         self.lda_c_fname = ldac_filename
-        self.hdp_output_directory = hdp_output_dir
+        self.hdp_output_directory = f"{hdp_output_dir}_Hyper{hdp_sample_hyper}"
         self.hdp_iterations = hdp_iters
         self.hdp_rand_seed = hdp_seed
         self.hdp_hyper_sampling = hdp_sample_hyper
@@ -76,14 +76,14 @@ class LssHdpModeller:
         """
         # Read in the plain text files
         plain_documents = []
-        with DiskTools.scan_directory(self.input_docs_path) as docs:
+        with Tools.scan_directory(self.input_docs_path) as docs:
             for doc in docs:
                 if doc.is_dir():
                     continue
                 try:
                     f = open(doc.path, mode="r", encoding="utf8")
                     plain_documents.append(f.read())
-                    self.doc_index.append(DiskTools.get_filename(doc.path))
+                    self.doc_index.append(Tools.get_filename(doc.path))
                 except PermissionError:
                     # Raised when trying to open a directory
                     print("Skipped while loading files: {}"
@@ -108,8 +108,9 @@ class LssHdpModeller:
         """ Convert a group of files LDA_C corpus and store it on disk"""
         bow_corpus, id2word_map, plain_docs = self._convert_corpus_to_bow()
         # Sterialise into LDA_C and store on disk
-        output_dir = r"{}\lda_c_format".format(self.input_docs_path)
-        DiskTools.initialise_directory(output_dir)
+        output_dir = r"{}\lda_c_format_Hyper{}".format(self.input_docs_path,
+                                                       self.hdp_hyper_sampling)
+        Tools.initialise_directory(output_dir)
         save_location = r"{}\{}.dat".format(
                 output_dir, self.lda_c_fname)
         bleicorpus.BleiCorpus.serialize(
@@ -165,7 +166,7 @@ class LssHdpModeller:
         amazon_df, id2word_map = self._convert_series_to_bow()
         # Sterialise it to disk as LDA-C
         output_dir = r"{}\lda_c_format".format(self.input_amazon_path)
-        DiskTools.initialise_directory(output_dir)
+        Tools.initialise_directory(output_dir)
         save_location = r"{}\{}.dat".format(
                 output_dir, self.lda_c_fname)
         bleicorpus.BleiCorpus.serialize(
@@ -176,12 +177,14 @@ class LssHdpModeller:
     def _invoke_gibbs_hdp(self):
         """Invoke Gibbs hdp posterior inference on the corpus"""
         path_executable = r"{}\hdp.exe".format(self.hdp_path)
-        param_data = r"{}\lda_c_format\{}.dat".format(self.input_docs_path,
-                                                      self.lda_c_fname)
+        param_data = r"{}\lda_c_format_Hyper{}\{}.dat".format(
+                self.input_docs_path,
+                self.hdp_hyper_sampling,
+                self.lda_c_fname)
         param_directory = r"{}\{}".format(self.input_docs_path,
                                           self.hdp_output_directory)
         # Prepare the output directory
-        DiskTools.initialise_directory(param_directory)
+        Tools.initialise_directory(param_directory)
 
         ret = s.run([path_executable,
                      "--algorithm",     "train",
@@ -205,7 +208,7 @@ class LssHdpModeller:
         param_directory = r"{}\{}".format(self.input_amazon_path,
                                           self.hdp_output_directory)
         # Prepare the output directory
-        DiskTools.initialise_directory(param_directory)
+        Tools.initialise_directory(param_directory)
 
         ret = s.run([path_executable,
                      "--algorithm",     "train",

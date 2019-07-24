@@ -9,10 +9,13 @@ from shutil import rmtree
 import pandas as pd
 import gzip
 import json
+from collections import defaultdict
+from typing import List, Dict
 
 
-class DiskTools:
-    """A helper class providing methods for managing files and folders"""
+class Tools:
+    """A helper class providing methods for managing files and folders
+    and processing data"""
 
     @staticmethod
     def initialise_directory(dir_path):
@@ -51,7 +54,7 @@ class DiskTools:
     @staticmethod
     def load_true_clusters_into_df(path) -> pd.DataFrame:
         # Read json file contents
-        json_content = DiskTools._read_json_file(path=path)
+        json_content = Tools._read_json_file(path=path)
 
         # The data is read as a list of list of dictionaries
         # Transofrming it to an indexed series with labels for compatability
@@ -85,7 +88,7 @@ class DiskTools:
 
         """
         # Read the json file
-        json_contents = DiskTools._read_json_file(path=path)
+        json_contents = Tools._read_json_file(path=path)
         # Dismantle the nested dictionaries
         temp_list = []
         for idx in range(0, len(json_contents)):
@@ -100,11 +103,30 @@ class DiskTools:
         vec = pd.Series(temp_dict, name="true")
         return vec
 
+    @staticmethod
+    def _splice_problemsets_dictionaries(ps_dicts: List[Dict]):
+        pass
+
+    @staticmethod
+    def form_problemset_result_dictionary(dictionaries: List[Dict],
+                                          l2_norms: List[bool],
+                                          identifiers: List[str],
+                                          problem_set: int):
+        res = defaultdict(list)
+        res["set"].extend([problem_set] * len(dictionaries))
+        for i, d in enumerate(dictionaries):
+            res["algorithm"].append(identifiers[i])
+            res["l2_normalised_data"].append(l2_norms[i])
+            for k in d.keys():
+                res[k].append(d[k])
+        return res
+
 
 class AmazonParser:
     """
     Encapsulates parsing and reading Amazon reviews.
     Original source code is available on: http://jmcauley.ucsd.edu/data/amazon/
+
     """
 
     @staticmethod
@@ -142,6 +164,7 @@ class AmazonParser:
 
 
 def main():
+    print("Aiders here")
     pass
 
 

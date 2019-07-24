@@ -22,7 +22,7 @@ import pandas as pd
 import bcubed
 from spherecluster import SphericalKMeans
 from sklearn.preprocessing import normalize
-import scipy.cluster.hierarchy as hac
+#import scipy.cluster.hierarchy as hac
 import math
 
 
@@ -53,8 +53,13 @@ class Clusterer:
             self.min_clusters = min_nbr_clusters
             self.max_clusters = max_nbr_clusters
             self.distance_metric = metric
-            if (desired_n_clusters is not None) and (
-                    desired_n_clusters < len(dtm)):
+
+            if desired_n_clusters == 0:
+                # Indicate usage of the best k for testing purposes
+                self.k = 1+max(true_labels)
+            elif (desired_n_clusters is not None) and (
+                    desired_n_clusters < len(dtm)) and (
+                            desired_n_clusters > 0):
                 self.k = desired_n_clusters
             else:
                 # Estimate k using X-Means on L2 normalised data
@@ -214,8 +219,8 @@ class Clusterer:
             bic_like_score = math.log(len(self.data))*k - (2*math.log(score))
             if verbose:
                 print((f"-► k={k:02} → score={score:.3f}"
-                      f"| aic like={aic_like_score:.3f}"
-                      f"| bic line={bic_like_score:.3f}"))
+                       f"| aic like={aic_like_score:.3f}"
+                       f"| bic line={bic_like_score:.3f}"))
 
             results.append([k,
                            score,
@@ -224,13 +229,16 @@ class Clusterer:
 
         return results
 
-    def _cluster_HAC(self, k: int, linkage: str = "single"):
+    def _cluster_HAC(self, k: int, linkage: str = "complete"):
         if k is None:
             # Compute the full tree and cache it to extract the best clustering
-            results = self._select_best_HAC(
-                    k_values=range(2, 1+len(self.data)//2),
-                    use_sil=False)
+#            results = self._select_best_HAC(
+#                    k_values=range(2, 1+len(self.data)//2),
+#                    use_sil=False)
             # The results do not seem to be useful... Terminating this path
+            hac = AgglomerativeClustering(n_clusters=self.k,
+                                          affinity=self.distance_metric,
+                                          linkage=linkage)
         else:
             hac = AgglomerativeClustering(n_clusters=k,
                                           affinity=self.distance_metric,
@@ -238,16 +246,18 @@ class Clusterer:
 
         return hac.fit_predict(self.data)
 
-    def _cluster_agglomerative(self, k: int, linkage: str = "single"):
-        """
-        Use SciPy implementation of HAC to avail myself of the automatice cut
-        location detection.
-        """
-        # Define the linkage scheme
-        z = hac.linkage(self.data.to_numpy(),
-                        metric="cosine",
-                        method=linkage)
-        return hac.fcluster(Z=z, t=k, criterion="maxclust")
+# =============================================================================
+#     def _cluster_agglomerative(self, k: int, linkage: str = "complete"):
+#         """
+#         Use SciPy implementation of HAC to avail myself of the automatice cut
+#         location detection.
+#         """
+#         # Define the linkage scheme
+#         z = hac.linkage(self.data.to_numpy(),
+#                         metric="cosine",
+#                         method=linkage)
+#         return hac.fcluster(Z=z, t=k, criterion="maxclust")
+# =============================================================================
 
     def _reshape_labels_as_dicts(
             self, labels: pd.Series) -> Dict[str, Set[str]]:
@@ -306,18 +316,16 @@ class Clusterer:
                     "bcubed_precision": round(bcubed_precision, 4),
                     "bcubed_recall": round(bcubed_recall, 4),
                     "bcubed_fscore": round(bcubed_f1, 4),
-                    "> AVERAGE ↑": round(
+                    "AVERAGE": round(
                             (nmi+ami+ari+fms+v_measure+bcubed_f1)/6,
                             2),
+                    "Silhouette": round(sil, 4),
+                    "Calinski_harabasz": round(ch, 4),
+                    "Davies_Bouldin": round(dv, 4)
                     # Here goes the unsupervised indices
                     })
-        us_ret = {}
-        us_ret.update({"Silhouette ↑": round(sil, 4),
-                       "Calinski_harabasz ↑": round(ch, 4),
-                       "Davies_Bouldin ↓": round(dv, 4)
-                       })
 
-        return [ret, us_ret]
+        return ret
 
     def eval_cluster_dbscan(self, epsilon: float, min_pts: int):
         clustering_lables = self._cluster_dbscan(epsilon=epsilon,
@@ -382,7 +390,31 @@ class Clusterer:
                 aligned_labels.true,
                 aligned_labels.predicted)
 
-    def eval_cluster_HAC(self, k=None, linkage="single"):
+# =============================================================================
+#     def eval_cluster_agglomerative(self, linkage="complete"):
+#         """
+#         Execute and evaluate HAC clustering.
+#
+#         Parameters
+#         ----------
+#         k : int
+#             The number of clusters to extract. If it is not specified then
+#             the X-Means BIC scheme is exploited for this.
+#         """
+#
+#         clustering_lables = self._cluster_agglomerative(k=self.k,
+#                                                         linkage=linkage)
+#         predicted = pd.Series(index=self.data.index, data=clustering_lables,
+#                               name="predicted")
+#         aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
+#                                    sort=False)
+#
+#         return clustering_lables, self._eval_clustering(
+#                 aligned_labels.true,
+#                 aligned_labels.predicted)
+#
+# =============================================================================
+    def eval_cluster_HAC(self, k=None, linkage="complete"):
         """
         Execute and evaluate HAC clustering.
 
