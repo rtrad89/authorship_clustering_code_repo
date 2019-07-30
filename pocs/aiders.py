@@ -11,6 +11,8 @@ import gzip
 import json
 from collections import defaultdict
 from typing import List, Dict
+import powerlaw
+import matplotlib.pyplot as plt
 
 
 class Tools:
@@ -128,6 +130,46 @@ class Tools:
             for k in d.keys():
                 res[k].append(d[k])
         return res
+
+    @staticmethod
+    def test_power_law_dist(true_labels_dir: str):
+        data = []
+        for ps in range(1, 61):
+            problem_nbr = f"{ps:03d}"
+            path = r"{}/problem{}/clustering.json".format(
+                    true_labels_dir,
+                    problem_nbr)
+            temp = Tools.load_true_clusters_into_vector(path)
+            data.extend(list(temp.value_counts()))
+
+        # Show the data:
+        plt.figure(dpi=600)
+        s = pd.Series(data)
+        s.value_counts().sort_index().plot.bar(x="cluster size")
+        plt.xlabel(xlabel="Size of cluster")
+        plt.ylabel(ylabel="Number of clusters")
+        plt.grid(b=True, axis="y")
+        plt.gcf().savefig("./data_hist.pdf")
+        plt.close()
+        # Fit a power law distribution to the cluster sizes data:
+        fit = powerlaw.Fit(data=data, estimate_discrete=True)
+        print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
+        print(f"Fit was finished with:"
+              f"\n\t→ alpha={fit.alpha:0.3f}"
+              f"\n\t→ sigma={fit.sigma:0.3f}"
+              f"\n\t→ x_min={fit.xmin:0.3f}")
+        # Compate the fit to other distributions:
+        candidates = ["truncated_power_law",
+                      "lognormal",
+                      "lognormal_positive",
+                      "exponential"]
+        print("---------------------------------")
+        for val in candidates:
+            R, p = fit.distribution_compare("power_law", val)
+            print(f"powerlaw <> {val}: R={R:0.3f}, p={p:0.3f}")
+        print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
+
+        return s, fit
 
 
 class AmazonParser:
