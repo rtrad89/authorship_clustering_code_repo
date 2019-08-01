@@ -109,13 +109,17 @@ class Tools:
     def splice_save_problemsets_dictionaries(ps_dicts: List[Dict]):
         integrated_results = defaultdict(list)
         for r in ps_dicts:
+            if r is None:
+                continue
             for k in r.keys():
                 integrated_results[k].extend(r[k])
 
         df = pd.DataFrame(data=integrated_results)
-        df.sort_values(by=["set", "bcubed_fscore"], ascending=[True, False]
-                       ).to_csv(path_or_buf="./__outputs__/results.csv",
-                                index=False)
+
+        if len(df) > 0:
+            df.sort_values(by=["set", "bcubed_fscore"], ascending=[True, False]
+                           ).to_csv(path_or_buf="./__outputs__/results.csv",
+                                    index=False)
 
     @staticmethod
     def form_problemset_result_dictionary(dictionaries: List[Dict],

@@ -24,7 +24,9 @@ def problem_set_run(problem_set_id: int,
                     infer_lss: bool = False,
                     scale_features: bool = False,
                     scaling_option: int = 2,
-                    hyper_sampling: bool = False):
+                    hyper_sampling: bool = True,
+                    verbose: bool = False,
+                    visualise: bool = False):
     problem_nbr = f"{problem_set_id:03d}"
     # Define an LSS modeller to represent documents in LSS non-sparse space
     # HDP with Gibbs sampler is being used as is from:
@@ -37,9 +39,10 @@ def problem_set_run(problem_set_id: int,
             ldac_filename=r"dummy_ldac_corpus",
             hdp_output_dir=r"hdp_lss",
             hdp_iters=10000,
-            hdp_seed=13712,
+            hdp_seed=1371,
             hdp_sample_hyper=hyper_sampling,
-            word_grams=1)
+            word_grams=1,
+            verbose=verbose)
 
     # Infer the BoW and LSS representations of the documents
     try:
@@ -55,15 +58,16 @@ def problem_set_run(problem_set_id: int,
             # Convert the data to indexed dataframe format
             lss_rep_docs = DataFrame(data=lss_rep_docs,
                                      index=plain_docs.index)
-        # Reduce the dimensionality for visualisation purposes
-        embedded_docs = TSNE(perplexity=5, n_iter=5000,
-                             random_state=13712, metric="cosine"
-                             ).fit_transform(lss_rep_docs)
-        plt.scatter(embedded_docs[:, 0], embedded_docs[:, 1])
-        plt.title(f"2-component projection of problem #{problem_nbr:}")
-        plt.gcf().savefig(r"./__outputs__/projection_training_{}".format(
-                problem_nbr))
-        plt.show()
+        if visualise:
+            # Reduce the dimensionality for visualisation purposes
+            embedded_docs = TSNE(perplexity=5, n_iter=5000,
+                                 random_state=13712, metric="cosine"
+                                 ).fit_transform(lss_rep_docs)
+            plt.scatter(embedded_docs[:, 0], embedded_docs[:, 1])
+            plt.title(f"2-component projection of problem #{problem_nbr:}")
+            plt.gcf().savefig(r"./__outputs__/projection_training_{}".format(
+                    problem_nbr))
+            plt.show()
         # Begin Clustering Attempts
         true_labels_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering"
                             r"\Datasets\pan17_train\truth"
@@ -198,10 +202,11 @@ def problem_set_run(problem_set_id: int,
 if __name__ == "__main__":
     problemsets_results = []
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-    for ps in range(1, 61):
+    for ps in range(1, 11):
         print(f"Executing on problem set ► {ps:03d} ◄ ..")
         ps_result = problem_set_run(problem_set_id=ps,
-                                    infer_lss=False)
+                                    infer_lss=True,
+                                    verbose=False)
         problemsets_results.append(ps_result)
         print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬(Done)▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
     Tools.splice_save_problemsets_dictionaries(problemsets_results)

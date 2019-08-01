@@ -28,7 +28,8 @@ class LssHdpModeller:
                  word_grams: int,
                  input_docs_path: str = None,
                  input_amazon_path: str = None,
-                 input_amazon_fname: str = None):
+                 input_amazon_fname: str = None,
+                 verbose: bool = False):
         """Default Constructor
 
         Parameters
@@ -52,6 +53,7 @@ class LssHdpModeller:
         self.hdp_hyper_sampling = hdp_sample_hyper
         self.word_grams = word_grams
         self.doc_index = []  # the index of the files read for reference
+        self.verbose = verbose
 
     def _convert_corpus_to_bow(self):
         """
@@ -240,11 +242,13 @@ class LssHdpModeller:
         print("\n> Starting HDP with {} iterations...".format(
                 self.hdp_iterations))
         t = time.perf_counter()
-        self._invoke_gibbs_hdp()  # To capture the output of hdp, assign a var
+        msg = self._invoke_gibbs_hdp()
         nt = time.perf_counter()
         print("***************************************")
         print(("HDP executed in {x:0.2f} seconds"
                ).format(x=nt-t))
+        if self.verbose:
+            print(msg)
         print("***************************************")
         return plain_docs, bow_rep
 
