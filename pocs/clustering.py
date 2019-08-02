@@ -22,8 +22,9 @@ import pandas as pd
 import bcubed
 from spherecluster import SphericalKMeans
 from sklearn.preprocessing import normalize
-#import scipy.cluster.hierarchy as hac
 import math
+from gap_statistic import OptimalK
+import gmeans
 
 
 class Clusterer:
@@ -68,12 +69,41 @@ class Clusterer:
             print("\nERROR: cannot create class.\n"
                   "Data must be passed as a dataframe or similar structure.\n")
 
-    def _estimate_k(self):
+    def _estimate_k(self, method: str):
+        """
+        Estimate the best k -number of clusters- using various methods.
+
+        Parameters
+        ----------
+        method: str
+            The method whereby the proper k is estimated.
+            Can assume the values bic, gap or gaussian
+
+        Returns
+        -------
+        k : int
+            The estimated number of clusters
+        None
+            If `method` isn't inputted correctly
+        """
+        # Normalise the data to L2 temporarily
         copy_data = self.data.copy()
         self.set_data(pd.DataFrame(normalize(self.data, norm="l2")))
-        k = len(unique(self._cluster_xmeans()))
+        if method == "bic":
+            k = len(unique(self._cluster_xmeans()))
+        elif method == "gap":
+            def ms(X, k):
+                c = MeanShift()
+                c.fit(X)
+                return c.cluster_centers_, c.predict(X)
+            gap = OptimalK(clusterer=ms)
+            k = gap(X=self.data, cluster_array=range(1, len(self.data)))
+        elif method == "gaussian":
+            k = len(self.data)//2
+        else:
+            return None
+        # Load the original data again
         self.data = copy_data.copy()
-
         return k
 
     def set_data(self, new_data: List[List]):

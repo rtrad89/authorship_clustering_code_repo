@@ -39,7 +39,7 @@ def problem_set_run(problem_set_id: int,
             ldac_filename=r"dummy_ldac_corpus",
             hdp_output_dir=r"hdp_lss",
             hdp_iters=10000,
-            hdp_seed=1371,
+            hdp_seed=137,
             hdp_sample_hyper=hyper_sampling,
             word_grams=1,
             verbose=verbose)
@@ -136,9 +136,9 @@ def problem_set_run(problem_set_id: int,
         nhac_s_pred, nhac_s_evals = clu_lss.eval_cluster_HAC(linkage="single")
         nhac_a_pred, nhac_a_evals = clu_lss.eval_cluster_HAC(linkage="average")
         # norm_agc_pred, norm_agc_evals = clu_lss.eval_cluster_agglomerative()
-
+        plt.close()
         # Return the results:
-        return Tools.form_problemset_result_dictionary(
+        return (Tools.form_problemset_result_dictionary(
                 dictionaries=[dbscan_evals, hdbscan_evals, ms_evals, xm_evals,
                               hac_complete_evals, hac_single_evals,
                               hac_average_evals, norm_spk_evals,
@@ -152,7 +152,10 @@ def problem_set_run(problem_set_id: int,
                              "SPKMEANS", "DBSCAN", "HDBSCAN",
                              "MeanShift", "XMEANS", "HAC_COMPLETE",
                              "HAC_SINGLE", "HAC_AVERAGE"],
-                problem_set=problem_set_id)
+                problem_set=problem_set_id),
+                lss_rep_docs,
+                plain_docs,
+                clu_lss)
 # =============================================================================
 #     print("\n> Sphirical K-Means Results:")
 #     pprint(norm_spk_evals)
@@ -194,7 +197,6 @@ def problem_set_run(problem_set_id: int,
 #     print("\n> DBSCAN Results")
 #     pprint(fs_evals)
 # =============================================================================
-        plt.close()
     except FileNotFoundError:
         print("Please run HDP on this data first.")
 
@@ -202,11 +204,11 @@ def problem_set_run(problem_set_id: int,
 if __name__ == "__main__":
     problemsets_results = []
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-    for ps in range(1, 11):
+    for ps in range(1, 2):
         print(f"Executing on problem set ► {ps:03d} ◄ ..")
-        ps_result = problem_set_run(problem_set_id=ps,
-                                    infer_lss=True,
-                                    verbose=False)
+        ps_result, lss, plain, clu = problem_set_run(problem_set_id=ps,
+                                                     infer_lss=False,
+                                                     verbose=False)
         problemsets_results.append(ps_result)
         print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬(Done)▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
     Tools.splice_save_problemsets_dictionaries(problemsets_results)

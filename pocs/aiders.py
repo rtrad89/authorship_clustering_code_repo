@@ -117,8 +117,11 @@ class Tools:
         df = pd.DataFrame(data=integrated_results)
 
         if len(df) > 0:
+            timestamp = str(pd.to_datetime("now")
+                            ).replace(":", "-").replace(".", "_")
+            path = f"./__outputs__/results_{timestamp}.csv"
             df.sort_values(by=["set", "bcubed_fscore"], ascending=[True, False]
-                           ).to_csv(path_or_buf="./__outputs__/results.csv",
+                           ).to_csv(path_or_buf=path,
                                     index=False)
 
     @staticmethod
