@@ -11,7 +11,7 @@ from nltk.util import ngrams
 import time
 import pandas as pd
 from aiders import AmazonParser, Tools
-from typing import Tuple  # , overload
+from typing import Tuple, List
 
 
 class LssHdpModeller:
@@ -401,11 +401,121 @@ class LssHdpModeller:
         return plain, bow_df, self._load_lss_representation_into_df()
 
 
+class LssOptimiser(LssHdpModeller):
+    """
+    A class for eta and concentration parameters optimisation across all
+    training data
+    """
+
+    def __init__(self,
+                 train_folders_path: str,
+                 hdp_path: str,
+                 ldac_filename: str,
+                 hdp_seed: int,
+                 eta_range: List[int],
+                 out_dir: str,
+                 hdp_iters: int = 1000
+                 ):
+        self.training_folder = train_folders_path
+        self.hdp_path = hdp_path
+        self.ldac = ldac_filename
+        self.seed = hdp_seed
+        self.etas = eta_range
+        self.out_dir = out_dir
+        self.iters = hdp_iters
+
+    def _get_number_words(self, vocab_filepath: str):
+        """Return the number of lines in the vocab file (→ unique words)
+
+        Returns
+        -------
+        int
+            The number of unique words in an lda-c corpus.
+        """
+
+        with open(vocab_filepath, encoding="utf8") as f:
+            for i, l in enumerate(f):
+                pass
+        return i+1
+
+    def assess_hyper_sampling(self, tail_prcnt: float = 0.25,
+                              verbose: bool = False):
+        """
+        A function to measure the average per word log-likelihood after
+        hyper-sampling the concentration parameters of the Dirichlet
+        distributions.
+        Caution: the hdp must have been run on the data with hyper sampling and
+        without it, in order to load the two representations and compare.
+
+        """
+        path_normal = r"/hdp_lss_HyperFalse/state.log"
+        path_hyper = r"/hdp_lss_HyperTrue/state.log"
+        path_ldac = (r"/lda_c_format_HyperTrue"
+                     r"/dummy_ldac_corpus.dat.vocab")
+        per_word_ll_normal = []
+        per_word_ll_hyper = []
+
+        if verbose:
+            print("-------------------------")
+
+        with Tools.scan_directory(self.training_folder) as dirs:
+            for d in dirs:
+                if d.name[0:7] != "problem":
+                    continue
+
+                if verbose:
+                    print(f"► Processing {d.name}")
+
+                normal = f"{d.path}\\{path_normal}"
+                hyper = f"{d.path}\\{path_hyper}"
+                vocab = f"{d.path}\\{path_ldac}"
+
+                n_words = self._get_number_words(vocab)
+                df_normal = pd.read_csv(filepath_or_buffer=normal,
+                                        delim_whitespace=True,
+                                        index_col="iter",
+                                        usecols=["iter", "likelihood"],
+                                        squeeze=True)
+                ll_normal = df_normal.tail(round(len(df_normal) * tail_prcnt
+                                                 )).mean()
+                per_word_ll_normal.append(ll_normal / n_words)
+
+                df_hyper = pd.read_csv(filepath_or_buffer=hyper,
+                                       delim_whitespace=True,
+                                       index_col="iter",
+                                       usecols=["iter", "likelihood"],
+                                       squeeze=True)
+                ll_hyper = df_hyper.tail(round(len(df_hyper) * tail_prcnt
+                                               )).mean()
+                per_word_ll_hyper.append(ll_hyper / n_words)
+
+        dct = {"Normal_Sampling":
+               round(sum(per_word_ll_normal) / len(per_word_ll_normal), 4),
+               "Hyper_Sampling":
+               round(sum(per_word_ll_hyper) / len(per_word_ll_hyper), 4)}
+
+        if verbose:
+            print("-------------------------")
+        return dct
+
+
 def main():
     print("Main thread started..\n")
+    folders_path = (r"D:\College\DKEM\Thesis"
+                    r"\AuthorshipClustering\Datasets\pan17_train")
+    hdp = r"D:\College\DKEM\Thesis\AuthorshipClustering\Code\hdps\hdp"
 
-    exit(0)
-#    plain, bow, lss = Modeller.get_corpus_lss(infer_lss=True)
+    optimiser = LssOptimiser(train_folders_path=folders_path,
+                             hdp_path=hdp,
+                             ldac_filename="dummy_ldac_corpus.dat",
+                             hdp_seed=1371224,
+                             eta_range=[0.1, 0.3, 0.5, 0.8, 1],
+                             out_dir=r"./__outputs__/eta_optimisation",
+                             hdp_iters=1000)
+
+    ret = optimiser.assess_hyper_sampling(verbose=True)
+
+    print(ret)
 
 
 if __name__ == "__main__":

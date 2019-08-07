@@ -222,8 +222,7 @@ class AmazonParser:
 
 def main():
     print("Aiders here")
-    pass
-
+    exit(0)
 
 if __name__ == "__main__":
     main()

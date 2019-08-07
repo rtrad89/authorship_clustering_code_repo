@@ -498,7 +498,7 @@ class Clusterer:
 
 
 def main():
-    pass
+    exit(0)
 
 
 if __name__ == "__main__":
