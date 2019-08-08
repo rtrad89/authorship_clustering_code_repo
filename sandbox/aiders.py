@@ -44,6 +44,30 @@ class Tools:
                   "are not already opened")
 
     @staticmethod
+    def initialise_directories(dir_path):
+        """
+        Ensure an empty directory is created in `dir_path`.
+
+        Parameters
+        ----------
+        dir_path : str
+            The path of the desired directory.
+
+        Raises
+        ------
+        PermissionError
+            If `dir_path` is not accessible by the current user.
+        """
+
+        try:
+            if os.path.exists(dir_path):
+                rmtree(dir_path)
+            os.makedirs(dir_path)
+        except PermissionError:
+            print("ERROR: Please make sure the folders required by the program"
+                  "are not already opened")
+
+    @staticmethod
     def get_filename(path) -> str:
         return os.path.basename(path)
 
@@ -178,6 +202,11 @@ class Tools:
 
         return s, fit
 
+    @staticmethod
+    def save_list_to_text(mylist: list, filepath: str):
+        with open(filepath, 'w') as file_handler:
+            for item in mylist:
+                file_handler.write(f"{item}\n")
 
 class AmazonParser:
     """

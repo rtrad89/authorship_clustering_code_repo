@@ -401,7 +401,7 @@ class LssHdpModeller:
         return plain, bow_df, self._load_lss_representation_into_df()
 
 
-class LssOptimiser(LssHdpModeller):
+class LssOptimiser:
     """
     A class for eta and concentration parameters optimisation across all
     training data
@@ -447,6 +447,13 @@ class LssOptimiser(LssHdpModeller):
         Caution: the hdp must have been run on the data with hyper sampling and
         without it, in order to load the two representations and compare.
 
+        Returns
+        -------
+        dct: dict
+            A dictionary containing the per word log-likelihood of the train
+            data with the two methods pertaining to sampling the concentration
+            parameters: normal and hyper.
+
         """
         path_normal = r"/hdp_lss_HyperFalse/state.log"
         path_hyper = r"/hdp_lss_HyperTrue/state.log"
@@ -456,7 +463,7 @@ class LssOptimiser(LssHdpModeller):
         per_word_ll_hyper = []
 
         if verbose:
-            print("-------------------------")
+            print("------Concentration Parameters Optimisation------")
 
         with Tools.scan_directory(self.training_folder) as dirs:
             for d in dirs:
@@ -464,7 +471,7 @@ class LssOptimiser(LssHdpModeller):
                     continue
 
                 if verbose:
-                    print(f"► Processing {d.name}")
+                    print(f"\t► Processing {d.name}")
 
                 normal = f"{d.path}\\{path_normal}"
                 hyper = f"{d.path}\\{path_hyper}"
@@ -495,8 +502,109 @@ class LssOptimiser(LssHdpModeller):
                round(sum(per_word_ll_hyper) / len(per_word_ll_hyper), 4)}
 
         if verbose:
-            print("-------------------------")
+            print("-------------------------------------------------")
+
+        pd.DataFrame(data=dct, index=[0]).to_csv(
+                f"{self.out_dir}/hyper_optimisation.csv", index=False)
         return dct
+
+    def _generate_etas_outputs(self,
+                               verbose: bool = False):
+        st = time.perf_counter()
+
+        ldac_path = r"lda_c_format_HyperFalse/dummy_ldac_corpus.dat"
+
+        with Tools.scan_directory(self.training_folder) as ps_folders:
+            for folder in ps_folders:
+
+                if not folder.name[0:7] == "problem":
+                    if verbose:
+                        print(f"→ Skipping {folder.name}")
+                    continue
+                for eta in self.etas:
+                    t = time.perf_counter()
+                    if verbose:
+                        print(f"► Applying HDP with eta={eta:0.1f}"
+                              f" on {folder.name}..")
+
+                    directory = (f"{self.out_dir}/eta_optimisation_"
+                                 f"{self.iters}itrs/{eta:0.1f}/{folder.name}")
+                    if (Tools.path_exists(directory)):
+                        if verbose:
+                            print("\tcached result found on disk")
+                        continue
+
+                    path_executable = r"{}\hdp.exe".format(self.hdp_path)
+                    data = f"{folder.path}/{ldac_path}"
+
+                    # Prepare the output directory
+                    Tools.initialise_directories(directory)
+
+                    s.run([path_executable,
+                           "--algorithm",     "train",
+                           "--data",          data,
+                           "--directory",     directory,
+                           "--max_iter",      str(self.iters),
+                           "--sample_hyper",  "no",
+                           "--save_lag",      "-1",
+                           "--eta",           str(eta),
+                           "--random_seed",   str(self.seed)],
+                          check=True, capture_output=True, text=True)
+
+                if verbose:
+                    print(f"--- {folder.name} done in "
+                          f"{time.perf_counter() - t:0.1f} seconds ---")
+        if verbose:
+            period = round(time.perf_counter() - st, 2)
+            print(f"▬▬▬▬▬ All done in {period} seconds ▬▬▬▬▬")
+
+    def smartly_optimise_eta(self,
+                             tail_prcnt: float = 0.1,
+                             verbose: bool = True):
+        # First generate the outputs to compare:
+        self._generate_etas_outputs(verbose=verbose)
+
+        ret = {}
+        # Loop over the outputs of different etas
+        for eta in self.etas:
+            master_folder = (f"{self.out_dir}/eta_optimisation_"
+                             f"{self.iters}iters/{eta:0.1f}")
+            pw_ll = []
+            errors = []
+            with Tools.scan_directory(master_folder) as problems:
+                for problem in problems:
+                    try:
+                        path_table = (f"{problem.path}"
+                                      "/mode-word-assignments.dat")
+                        n_words = pd.read_csv(filepath_or_buffer=path_table,
+                                              delim_whitespace=True,
+                                              usecols=["w"],
+                                              squeeze=True).nunique()
+                        path_state = f"{problem.path}/state.log"
+                        df_state = pd.read_csv(filepath_or_buffer=path_state,
+                                               delim_whitespace=True,
+                                               index_col="iter",
+                                               usecols=["iter", "likelihood"],
+                                               squeeze=True)
+                        ll = df_state.tail(round(len(df_state) * tail_prcnt
+                                                 )).mean()
+                        pw_ll.append(ll / n_words)
+                    except FileNotFoundError as e:
+                        print(f"{e}")
+                        errors.append(f"{e}")
+                        continue
+            ret.update({f"eta_{eta:0.1f}":
+                        round(sum(pw_ll) / len(pw_ll), 4)})
+        # Save any encountered errors to disk too
+        Tools.save_list_to_text(mylist=errors,
+                                filepath=(f"{self.out_dir}/eta_{self.iters}"
+                                          "iters_errors.txt")
+                                )
+
+        pd.DataFrame(data=ret, index=[0]).to_csv(
+                f"{self.out_dir}/eta_optimisation_{self.iters}iters.csv",
+                index=False)
+        return ret
 
 
 def main():
@@ -510,12 +618,14 @@ def main():
                              ldac_filename="dummy_ldac_corpus.dat",
                              hdp_seed=1371224,
                              eta_range=[0.1, 0.3, 0.5, 0.8, 1],
-                             out_dir=r"./__outputs__/eta_optimisation",
-                             hdp_iters=1000)
+                             out_dir=r"./__outputs__",
+                             hdp_iters=10000)
 
-    ret = optimiser.assess_hyper_sampling(verbose=True)
+#    ret = optimiser.assess_hyper_sampling(verbose=True)
+#    print(ret)
 
-    print(ret)
+    ret_eta = optimiser.smartly_optimise_eta(verbose=True)
+    print(ret_eta)
 
 
 if __name__ == "__main__":
