@@ -319,9 +319,6 @@ class Clusterer:
                     "bcubed_precision": round(bcubed_precision, 4),
                     "bcubed_recall": round(bcubed_recall, 4),
                     "bcubed_fscore": round(bcubed_f1, 4),
-                    "AVERAGE": round(
-                            (nmi+ami+ari+fms+v_measure+bcubed_f1)/6,
-                            2),
                     "Silhouette": round(sil, 4
                                         ) if sil is not None else None,
                     "Calinski_harabasz": round(ch, 4

@@ -313,7 +313,7 @@ class LssOptimiser:
                 pass
         return i+1
 
-    def assess_hyper_sampling(self, tail_prcnt: float = 0.25,
+    def assess_hyper_sampling(self, tail_prcnt: float,
                               verbose: bool = False):
         """
         A function to measure the average per word log-likelihood after
@@ -435,7 +435,7 @@ class LssOptimiser:
             print(f"▬▬▬▬▬ All done in {period} seconds ▬▬▬▬▬")
 
     def smartly_optimise_eta(self,
-                             tail_prcnt: float = 0.1,
+                             tail_prcnt: float,
                              verbose: bool = True):
         # First generate the outputs to compare:
         self._generate_etas_outputs(verbose=verbose)
@@ -444,7 +444,7 @@ class LssOptimiser:
         # Loop over the outputs of different etas
         for eta in self.etas:
             master_folder = (f"{self.out_dir}/eta_optimisation_"
-                             f"{self.iters}iters/{eta:0.1f}")
+                             f"{self.iters}itrs/{eta:0.1f}")
             pw_ll = []
             errors = []
             with Tools.scan_directory(master_folder) as problems:
