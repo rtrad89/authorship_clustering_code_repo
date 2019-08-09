@@ -5,9 +5,8 @@ Created on Fri Jul 12 02:36:07 2019
 @author: RTRAD
 """
 from lss_modeller import LssHdpModeller
-from clustering import Clusterer
 from aiders import Tools
-from sklearn.preprocessing import normalize
+from clustering import Clusterer
 import warnings
 
 warnings.filterwarnings(action="ignore")  # Supress warning for this code file
@@ -24,14 +23,14 @@ def problem_set_run(problem_set_id: int,
     #   https://github.com/blei-lab/hdp
 
     Modeller = LssHdpModeller(
-            hdp_path=r"..\..\hdps\hdp",
-            input_docs_path=r"..\..\..\Datasets\pan17_train\problem{}".format(
+            hdp_path=r"..\hdps\hdp",
+            input_docs_path=r"..\..\Datasets\pan17_train\problem{}".format(
                     problem_nbr),
             ldac_filename=r"dummy_ldac_corpus",
             hdp_output_dir=r"hdp_lss",
             hdp_iters=10000,
             hdp_seed=seed,
-            hdp_sample_hyper="no",
+            hdp_sample_hyper=False,
             word_grams=1,
             verbose=verbose)
 
@@ -42,16 +41,16 @@ def problem_set_run(problem_set_id: int,
                 infer_lss)
 
         # Begin Clustering Attempts
-        true_labels_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering"
-                            r"\Datasets\pan17_train\truth"
+        true_labels_path = (r"..\..\Datasets\pan17_train\truth"
                             r"\problem{}\clustering.json"
                             ).format(problem_nbr)
 
         ground_truth = Tools.load_true_clusters_into_vector(true_labels_path)
 
-        clu_lss = Clusterer(dtm=lss_rep_docs,
+        # Normalise the data
+        clu_lss = Clusterer(dtm=Tools.normalise_data(data=lss_rep_docs),
                             true_labels=ground_truth,
-                            max_nbr_clusters=len(lss_rep_docs)//2,
+                            max_nbr_clusters=len(lss_rep_docs)-1,
                             min_nbr_clusters=1,
                             min_cluster_size=2,
                             metric="cosine",
@@ -60,29 +59,27 @@ def problem_set_run(problem_set_id: int,
         # spkmeans normalises by default using the l2 norm
         norm_spk_pred, norm_spk_evals = clu_lss.eval_cluster_spherical_kmeans()
 
-        # Normalise the data for other algorithms
-        clu_lss.set_data(normalize(lss_rep_docs, norm="l2"))
-
-        norm_dbscan_pred, norm_dbscan_evals = clu_lss.eval_cluster_dbscan(
-                epsilon=0.05, min_pts=2)
         norm_hdbscan_pred, norm_hdbscan_evals = clu_lss.eval_cluster_hdbscan()
         norm_ms_pred, norm_ms_evals = clu_lss.eval_cluster_mean_shift()
         norm_xm_pred, norm_xm_evals = clu_lss.eval_cluster_xmeans()
-        nhac_complete_pred, nhac_complete_evals = clu_lss.eval_cluster_hac()
-        nhac_s_pred, nhac_s_evals = clu_lss.eval_cluster_hac(linkage="single")
-        nhac_a_pred, nhac_a_evals = clu_lss.eval_cluster_hac(linkage="average")
+        nhac_complete_pred, nhac_complete_evals = clu_lss.eval_cluster_hac(
+                linkage="complete")
+        nhac_s_pred, nhac_s_evals = clu_lss.eval_cluster_hac(
+                linkage="single")
+        nhac_a_pred, nhac_a_evals = clu_lss.eval_cluster_hac(
+                linkage="average")
         nhdp_pred, nhdp_evals = clu_lss.eval_cluster_hdp()
         ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
 
         # Return the results:
         return (Tools.form_problemset_result_dictionary(
                 dictionaries=[
-                        norm_spk_evals, norm_dbscan_evals,
-                        norm_hdbscan_evals, norm_ms_evals, norm_xm_evals,
+                        norm_spk_evals, norm_hdbscan_evals,
+                        norm_ms_evals, norm_xm_evals,
                         nhac_complete_evals, nhac_s_evals, nhac_a_evals,
                         nhdp_evals, ntrue_evals
                         ],
-                identifiers=["SPKMEANS", "DBSCAN", "HDBSCAN",
+                identifiers=["SPKMEANS", "HDBSCAN",
                              "MeanShift", "XMEANS", "HAC_COMPLETE",
                              "HAC_SINGLE", "HAC_AVERAGE", "HDP", "TRUE"],
                 problem_set=problem_set_id),
@@ -104,18 +101,18 @@ if __name__ == "__main__":
     for ps in range(1, 61):
         print(f"Executing on problem set ► {ps:03d} ◄ ..")
         ps_result, l, lss, plain, clu = problem_set_run(
-                problem_set_id=ps,
-                infer_lss=True,
-                hyper_sampling=False,
-                # Emperically specify a random seed that's compatible with
-                # hyper sampling and certain problem sets due to a bug in HDP
-                # as it seems. However, the seeds would be consistant across
-                # runs and yield comparable results for our experiments
-                # (comparing different runs of HDP on a problem set)
-                seed=max(33, 70*(ps == 41)) + (3 * (ps in problematics)),
-                verbose=False,
-                n_clusters=0)
+            problem_set_id=ps,
+            n_clusters=None,
+            # Emperically specify a random seed that's compatible with
+            # hyper sampling and certain problem sets due to a bug in HDP
+            # as it seems. However, the seeds would be consistant across
+            # runs and yield comparable results for our experiments
+            # (comparing different runs of HDP on a problem set)
+            seed=max(33, 70*(ps == 41)) + (3 * (ps in problematics)),
+            infer_lss=False,
+            verbose=False)
         problemsets_results.append(ps_result)
+        print(f"\tNote: k={clu.k}")
         print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬(Done)▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
     Tools.splice_save_problemsets_dictionaries(problemsets_results)
     print("Execution finished.")

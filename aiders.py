@@ -12,6 +12,7 @@ from collections import defaultdict
 from typing import List, Dict
 import powerlaw
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import normalize
 
 
 class Tools:
@@ -142,21 +143,19 @@ class Tools:
 
         if len(df) > 0:
             timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
-            path = f"./__outputs__/results_{timestamp}_{suffix}.csv"
+            path = f"./__outputs__/results_{timestamp}{suffix}.csv"
             df.sort_values(by=["set", "bcubed_fscore"], ascending=[True, False]
                            ).to_csv(path_or_buf=path,
                                     index=False)
 
     @staticmethod
     def form_problemset_result_dictionary(dictionaries: List[Dict],
-                                          l2_norms: List[bool],
                                           identifiers: List[str],
                                           problem_set: int):
         res = defaultdict(list)
         res["set"].extend([problem_set] * len(dictionaries))
         for i, d in enumerate(dictionaries):
             res["algorithm"].append(identifiers[i])
-            res["l2_normalised_data"].append(l2_norms[i])
             for k in d.keys():
                 res[k].append(d[k])
         return res
@@ -206,6 +205,12 @@ class Tools:
         with open(filepath, 'w') as file_handler:
             for item in mylist:
                 file_handler.write(f"{item}\n")
+
+    @staticmethod
+    def normalise_data(data: List[List]):
+        # Form a normalised dataframe with the same index
+        return pd.DataFrame(data=normalize(data, norm="l2"),
+                            index=data.index)
 
 
 def main():

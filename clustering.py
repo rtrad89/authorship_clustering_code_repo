@@ -4,7 +4,7 @@ Created on Tue Jul  9 19:25:40 2019
 
 @author: RTRAD
 """
-from sklearn.cluster import DBSCAN, MeanShift, AgglomerativeClustering
+from sklearn.cluster import MeanShift, AgglomerativeClustering
 import hdbscan
 from pyclustering.cluster.xmeans import xmeans
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
@@ -21,7 +21,6 @@ from numpy import place, column_stack, unique, inf
 import pandas as pd
 import bcubed
 from spherecluster import SphericalKMeans
-from sklearn.preprocessing import normalize
 from gap_statistic import OptimalK
 from gmeans import GMeans
 
@@ -80,10 +79,6 @@ class Clusterer:
             Note: the data would be L2-normalised before proceeding
 
         """
-
-        # Normalise the data to L2 temporarily
-        copy_data = self.data.copy()
-        self.set_data(pd.DataFrame(normalize(self.data, norm="l2")))
         k_bic = len(unique(self._cluster_xmeans()))
 
         def ms(X, k):
@@ -97,18 +92,7 @@ class Clusterer:
         gmeans.fit(self.data)
         k_gaussian = len(unique(gmeans.labels_))
 
-        # Load the original data again
-        self.data = copy_data.copy()
         return round((k_bic + k_gap + k_gaussian) / 3)
-
-    def set_data(self, new_data: List[List]):
-        if isinstance(new_data, pd.DataFrame):
-            self.data = new_data
-        else:
-            # Form a dataframe with the same index to be the replacement
-            idx = self.data.index
-            self.data = pd.DataFrame(data=new_data,
-                                     index=idx)
 
     def _process_noise_as_singletons(self, result: List):
 
@@ -117,13 +101,6 @@ class Clusterer:
               )
 
         return result
-
-    def _cluster_dbscan(self, epsilon: float, min_pts: int):
-        labels = DBSCAN(eps=epsilon, min_samples=min_pts,
-                        metric=self.distance_metric, n_jobs=-1
-                        ).fit_predict(self.data)
-
-        return self._process_noise_as_singletons(labels)
 
     def _cluster_mean_shift(self):
         return MeanShift().fit_predict(self.data)
@@ -198,15 +175,16 @@ class Clusterer:
         to textual high dimentional data.
 
         """
+
         # Pay attention that k-means++ initialiser may be using Eucledian
         # distances still.. hence the "random" choice
         skm = SphericalKMeans(n_clusters=self.k, init="k-means++", n_init=25,
-                              n_jobs=-1, random_state=13712, normalize=True)
+                              n_jobs=-1, random_state=13712, normalize=False)
         return skm.fit_predict(self.data)
 
     def _select_best_hac(self,
+                         linkage: str,
                          use_sil: bool = True,
-                         linkage: str = "average",
                          verbose: bool = False):
         """
         Select the best cut in the HAC tree according to an unsupervised
@@ -249,25 +227,22 @@ class Clusterer:
                 max_score = score
                 best_k = k
                 clustering = pred
+        if verbose:
+            print(f"\tBest k for HAC ({linkage}) is {best_k}..")
 
         return (best_k, max_score, clustering)
 
-    def _cluster_hac(self, k: int, linkage: str = "average"):
+    def _cluster_hac(self, k: int, linkage: str):
         if k is None:
-            # Compute the full tree and cache it to extract the best clustering
-#            results = self._select_best_hac(
-#                    k_values=range(2, 1+len(self.data)//2),
-#                    use_sil=False)
-            # The results do not seem to be useful... Terminating this path
-            hac = AgglomerativeClustering(n_clusters=self.k,
-                                          affinity=self.distance_metric,
-                                          linkage=linkage)
+            k, _, pred = self._select_best_hac(linkage=linkage,
+                                               verbose=True)
         else:
             hac = AgglomerativeClustering(n_clusters=k,
                                           affinity=self.distance_metric,
                                           linkage=linkage)
+            pred = hac.fit_predict(self.data)
 
-        return hac.fit_predict(self.data)
+        return pred
 
     def _hdp_topic_clusters(self):
         """
@@ -358,18 +333,6 @@ class Clusterer:
 
         return ret
 
-    def eval_cluster_dbscan(self, epsilon: float, min_pts: int):
-        clustering_lables = self._cluster_dbscan(epsilon=epsilon,
-                                                 min_pts=min_pts)
-        predicted = pd.Series(index=self.data.index, data=clustering_lables,
-                              name="predicted")
-        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
-                                   sort=False)
-
-        return clustering_lables, self._eval_clustering(
-                aligned_labels.true,
-                aligned_labels.predicted)
-
     def eval_cluster_hdbscan(self):
         clustering_lables = self._cluster_hdbscan()
         predicted = pd.Series(index=self.data.index, data=clustering_lables,
@@ -421,7 +384,7 @@ class Clusterer:
                 aligned_labels.true,
                 aligned_labels.predicted)
 
-    def eval_cluster_hac(self, k=None, linkage="complete"):
+    def eval_cluster_hac(self, linkage: str, k=None):
         """
         Execute and evaluate HAC clustering.
 

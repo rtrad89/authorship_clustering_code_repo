@@ -5,12 +5,11 @@
 from __future__ import annotations  # To defer evaluation of type hints
 import subprocess as s
 from gensim.corpora import Dictionary, bleicorpus
-# from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.util import ngrams
 import time
 import pandas as pd
-from aiders import AmazonParser, Tools
+from aiders import Tools
 from typing import Tuple, List
 
 
@@ -121,37 +120,6 @@ class LssHdpModeller:
                 fname=save_location, corpus=bow_corpus,
                 id2word=id2word_map)
         return plain_docs, bow_corpus
-
-    def _convert_series_to_bow(self, words_threshold=10):
-        """
-        Convert a series of texts to BoW represetaion
-
-        Parameters
-        ----------
-        words_threshold : int
-            The minimum amount of words in a document to be included in the
-            representation. Documents which contain a smaller amount of words
-            shall be excluded.
-        """
-
-        # Load the data into a pandas dataframe
-        amazon_df = AmazonParser.get_dataframe(r"{}\{}".format(
-                self.input_amazon_path, self.input_amazon_filename))
-
-        # Tokenise
-        amazon_df["tokenised"] = amazon_df.reviewText.str.lower().apply(
-                word_tokenize)
-        # Filter out any too short reviews (less than words_threshold)
-        amazon_df = amazon_df[amazon_df.tokenised.map(len) >= words_threshold]
-        # Construct the word grams
-        amazon_df.tokenised = [
-                [' '.join(tkn) for tkn in
-                 ngrams(r, self.word_grams)]
-                for r in amazon_df.tokenised]
-        # Establish the dictionary
-        dictionary = Dictionary(amazon_df.tokenised)
-        amazon_df["bow"] = amazon_df.tokenised.apply(dictionary.doc2bow)
-        return (amazon_df, dictionary)
 
     def _generate_lda_c_from_dataframe(self):
         """
@@ -428,8 +396,9 @@ class LssOptimiser:
                     if verbose:
                         print(f"→ Skipping {folder.name}")
                     continue
+
+                t = time.perf_counter()
                 for eta in self.etas:
-                    t = time.perf_counter()
                     if verbose:
                         print(f"► Applying HDP with eta={eta:0.1f}"
                               f" on {folder.name}..")
@@ -528,8 +497,8 @@ def main():
                              out_dir=r"./__outputs__",
                              hdp_iters=10000)
 
-#    ret = optimiser.assess_hyper_sampling(verbose=True)
-#    print(ret)
+    ret = optimiser.assess_hyper_sampling(verbose=True)
+    print(ret)
 
     ret_eta = optimiser.smartly_optimise_eta(tail_prcnt=0.25, verbose=True)
     print(ret_eta)
