@@ -97,6 +97,7 @@ if __name__ == "__main__":
     # hyper sampling being on, so results were produced but not saved
     problematics = [15, 30, 45, 51, 56, 59, 60]
     problemsets_results = []
+    k_vals = []
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
     for ps in range(1, 61):
         print(f"Executing on problem set ► {ps:03d} ◄ ..")
@@ -112,7 +113,12 @@ if __name__ == "__main__":
             infer_lss=False,
             verbose=False)
         problemsets_results.append(ps_result)
-        print(f"\tNote: k={clu.k}")
+        ks = clu.cand_k.copy()
+        ks.append(1+max(clu.true_labels))
+        k_vals.append(ks)
         print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬(Done)▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-    Tools.splice_save_problemsets_dictionaries(problemsets_results)
+    my_suffix = "_new_HAC_k_avg_CH_criterion"
+    Tools.splice_save_problemsets_dictionaries(problemsets_results,
+                                               suffix=my_suffix)
+    Tools.save_k_vals_as_df(k_vals=k_vals, suffix=my_suffix)
     print("Execution finished.")

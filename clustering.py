@@ -56,13 +56,16 @@ class Clusterer:
             if desired_n_clusters == 0:
                 # Indicate usage of the best k for testing purposes
                 self.k = 1+max(true_labels)
+                self.estimated_k = False
             elif (desired_n_clusters is not None) and (
                     desired_n_clusters < len(dtm)) and (
                             desired_n_clusters > 0):
                 self.k = desired_n_clusters
+                self.estimated_k = False
             else:
                 # Estimate k using on L2 normalised data
-                self.k = self._estimate_k()
+                self.k, self.cand_k = self._estimate_k()
+                self.estimated_k = True
         else:
             print("\nERROR: cannot create class.\n"
                   "Data must be passed as a dataframe or similar structure.\n")
@@ -86,13 +89,14 @@ class Clusterer:
             c.fit(X)
             return c.cluster_centers_, c.predict(X)
         gap = OptimalK(clusterer=ms)
-        k_gap = gap(X=self.data, cluster_array=range(1, len(self.data)))
+        k_gap = gap(X=self.data, cluster_array=range(2, len(self.data)-1))
 
         gmeans = GMeans(random_state=137, max_depth=500)
         gmeans.fit(self.data)
         k_gaussian = len(unique(gmeans.labels_))
 
-        return round((k_bic + k_gap + k_gaussian) / 3)
+        return (round((k_bic + k_gap + k_gaussian) / 3),
+                [k_bic, k_gap, k_gaussian])
 
     def _process_noise_as_singletons(self, result: List):
 
@@ -204,7 +208,7 @@ class Clusterer:
         best_k = -1
         clustering = None
 
-        for k in range(2, len(self.data)):
+        for k in range(2, len(self.data)-1):
             hac = AgglomerativeClustering(n_clusters=k,
                                           affinity=self.distance_metric,
                                           linkage=linkage,
@@ -232,15 +236,19 @@ class Clusterer:
 
         return (best_k, max_score, clustering)
 
-    def _cluster_hac(self, k: int, linkage: str):
-        if k is None:
-            k, _, pred = self._select_best_hac(linkage=linkage,
-                                               verbose=True)
+    def _cluster_hac(self, linkage: str):
+        if self.estimated_k:
+            hac_k, _, pred = self._select_best_hac(linkage=linkage,
+                                                   verbose=True)
+            k = round((hac_k + sum(self.cand_k)) / (1+len(self.cand_k)))
         else:
-            hac = AgglomerativeClustering(n_clusters=k,
-                                          affinity=self.distance_metric,
-                                          linkage=linkage)
-            pred = hac.fit_predict(self.data)
+            k = self.k
+
+        self.cand_k.append(k)
+        hac = AgglomerativeClustering(n_clusters=k,
+                                      affinity=self.distance_metric,
+                                      linkage=linkage)
+        pred = hac.fit_predict(self.data)
 
         return pred
 
@@ -381,7 +389,7 @@ class Clusterer:
                 aligned_labels.true,
                 aligned_labels.predicted)
 
-    def eval_cluster_hac(self, linkage: str, k=None):
+    def eval_cluster_hac(self, linkage: str):
         """
         Execute and evaluate HAC clustering.
 
@@ -392,7 +400,7 @@ class Clusterer:
             X-Means BIC scheme is exploited for this.
         """
 
-        clustering_lables = self._cluster_hac(k=k, linkage=linkage)
+        clustering_lables = self._cluster_hac(linkage=linkage)
         predicted = pd.Series(index=self.data.index, data=clustering_lables,
                               name="predicted")
         aligned_labels = pd.concat([self.true_labels, predicted], axis=1,

@@ -212,6 +212,18 @@ class Tools:
         return pd.DataFrame(data=normalize(data, norm="l2"),
                             index=data.index)
 
+    @staticmethod
+    def save_k_vals_as_df(k_vals: List[List],
+                          suffix=""):
+        df_k_vals = pd.DataFrame(k_vals,
+                                 columns=["bic", "gap", "gmeans",
+                                          "hac_c", "hac_s", "hac_a",
+                                          "true"])
+
+        timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
+        path = f"./__outputs__/k_trend_{timestamp}{suffix}.csv"
+        df_k_vals.to_csv(path)
+
 
 def main():
     print("Aiders here")
