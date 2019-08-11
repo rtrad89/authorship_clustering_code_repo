@@ -239,7 +239,7 @@ class LssHdpModeller:
                    ).format(path))
             raise
 
-    def get_corpus_lss(self, infer_lss=True
+    def get_corpus_lss(self, infer_lss
                        ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Get high- and low-dimenstional representations of data.

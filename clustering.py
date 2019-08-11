@@ -4,7 +4,7 @@ Created on Tue Jul  9 19:25:40 2019
 
 @author: RTRAD
 """
-from sklearn.cluster import MeanShift, AgglomerativeClustering
+from sklearn.cluster import MeanShift, AgglomerativeClustering, OPTICS
 import hdbscan
 from pyclustering.cluster.xmeans import xmeans
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
@@ -84,6 +84,7 @@ class Clusterer:
         """
         k_bic = len(unique(self._cluster_xmeans()))
 
+        # Define a custom clusterer for the Gap statistic
         def ms(X, k):
             c = MeanShift()
             c.fit(X)
@@ -239,7 +240,7 @@ class Clusterer:
     def _cluster_hac(self, linkage: str):
         if self.estimated_k:
             hac_k, _, pred = self._select_best_hac(linkage=linkage,
-                                                   verbose=True)
+                                                   verbose=False)
             k = round((hac_k + sum(self.cand_k)) / (1+len(self.cand_k)))
         else:
             k = self.k

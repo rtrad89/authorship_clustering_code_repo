@@ -117,7 +117,7 @@ if __name__ == "__main__":
         ks.append(1+max(clu.true_labels))
         k_vals.append(ks)
         print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬(Done)▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-    my_suffix = "_new_HAC_k_avg_CH_criterion"
+    my_suffix = "_trying_gap_kmeans"
     Tools.splice_save_problemsets_dictionaries(problemsets_results,
                                                suffix=my_suffix)
     Tools.save_k_vals_as_df(k_vals=k_vals, suffix=my_suffix)
