@@ -28,6 +28,14 @@ from gmeans import GMeans
 
 
 class Clusterer:
+    # Define algorithms options for external usage
+    alg_mean_shift = 1
+    alg_h_dbscan = 2
+    alg_x_means = 3
+    alg_spherical_k_means = 4
+    alg_iterative_spherical_k_means = 5
+    alg_hac = 6
+    alg_optics = 7
 
     def __init__(self,
                  dtm: List[List],
@@ -102,7 +110,6 @@ class Clusterer:
                 [k_bic, k_gap, k_gaussian])
 
     def _process_noise_as_singletons(self, result: List):
-
         place(result, result == -1,
               range(1 + result.max(), 1 + result.max()+len(result))
               )
@@ -175,7 +182,8 @@ class Clusterer:
         # Extract the clusters and return them
         return self._process_xmeans_output(xmeans_instance.get_clusters())
 
-    def _cluster_spherical_kmeans(self):
+    def _cluster_spherical_kmeans(self,
+                                  init: str = "k-means++"):
         """
         Employ spherical k-means on L2 normalised directional data points. The
         algorithm uses cosine distances internally, and is especially suited
@@ -185,7 +193,7 @@ class Clusterer:
 
         # Pay attention that k-means++ initialiser may be using Eucledian
         # distances still.. hence the "random" choice
-        skm = SphericalKMeans(n_clusters=self.k, init="k-means++", n_init=500,
+        skm = SphericalKMeans(n_clusters=self.k, init=init, n_init=500,
                               random_state=13712, normalize=False)
         return skm.fit_predict(self.data)
 
@@ -283,7 +291,7 @@ class Clusterer:
 
         return pred
 
-    def _extract_best_optics(self, clusterer, use_sil: bool):
+    def _extract_best_optics(self, clusterer):
         max_score = -inf
         best_pred = None
 
@@ -294,7 +302,6 @@ class Clusterer:
                     ordering=clusterer.ordering_, eps=my_eps)
 
             if not len(unique(pred)) in (1, len(self.data)):
-
                 score = silhouette_score(X=self.data,
                                          labels=pred,
                                          metric=self.distance_metric,
@@ -306,14 +313,13 @@ class Clusterer:
 
         return self._process_noise_as_singletons(best_pred)
 
-    def _cluster_optics(self,
-                        silhouette_scorer: bool = True):
+    def _cluster_optics(self):
         optics = OPTICS(min_cluster_size=self.min_clu_size,
                         min_samples=self.min_clu_size,
                         metric=self.distance_metric,
                         leaf_size=len(self.data))
         optics.fit(X=self.data)
-        return self._extract_best_optics(optics, use_sil=silhouette_scorer)
+        return self._extract_best_optics(optics)
 
     def _hdp_topic_clusters(self):
         """
@@ -401,7 +407,37 @@ class Clusterer:
 
         return ret
 
-    def evaluate(self, clustering_lables: List):
+    def evaluate(self,
+                 alg_option: int,
+                 param_linkage: str = None,
+                 param_init: str = None):
+
+        if alg_option == Clusterer.alg_h_dbscan:
+            clustering_lables = self._cluster_hdbscan()
+
+        elif alg_option == Clusterer.alg_hac:
+            clustering_lables = self._cluster_hac(
+                    linkage=param_linkage)
+
+        elif alg_option == Clusterer.alg_iterative_spherical_k_means:
+            clustering_lables = self._cluster_ispherical_kmeans(
+                    init=param_init)
+
+        elif alg_option == Clusterer.alg_mean_shift:
+            clustering_lables = self._cluster_mean_shift()
+
+        elif alg_option == Clusterer.alg_optics:
+            clustering_lables = self._cluster_optics()
+
+        elif alg_option == Clusterer.alg_spherical_k_means:
+            clustering_lables = self._cluster_spherical_kmeans()
+
+        elif alg_option == Clusterer.alg_x_means:
+            clustering_lables = self._cluster_xmeans()
+
+        else:
+            return None
+
         predicted = pd.Series(index=self.data.index, data=clustering_lables,
                               name="predicted")
         aligned_labels = pd.concat([self.true_labels, predicted], axis=1,

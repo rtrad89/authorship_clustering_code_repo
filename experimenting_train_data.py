@@ -57,18 +57,55 @@ def problem_set_run(problem_set_id: int,
                             desired_n_clusters=n_clusters)
 
         # spkmeans normalises by default using the l2 norm
-        norm_spk_pred, norm_spk_evals = clu_lss.eval_cluster_spherical_kmeans()
-        ispk_pred, ispk_evals = clu_lss.eval_cluster_ispherical_kmeans()
-        norm_hdbscan_pred, norm_hdbscan_evals = clu_lss.eval_cluster_hdbscan()
-        norm_ms_pred, norm_ms_evals = clu_lss.eval_cluster_mean_shift()
-        norm_xm_pred, norm_xm_evals = clu_lss.eval_cluster_xmeans()
-        nhac_complete_pred, nhac_complete_evals = clu_lss.eval_cluster_hac(
-                linkage="complete")
-        nhac_s_pred, nhac_s_evals = clu_lss.eval_cluster_hac(
-                linkage="single")
-        nhac_a_pred, nhac_a_evals = clu_lss.eval_cluster_hac(
-                linkage="average")
-        n_optics_pred, n_optics_evals = clu_lss.eval_cluster_optics()
+# =============================================================================
+#         norm_spk_pred, norm_spk_evals = clu_lss.eval_cluster_spherical_kmeans()
+#         ispk_pred, ispk_evals = clu_lss.eval_cluster_ispherical_kmeans()
+#         norm_hdbscan_pred, norm_hdbscan_evals = clu_lss.eval_cluster_hdbscan()
+#         norm_ms_pred, norm_ms_evals = clu_lss.eval_cluster_mean_shift()
+#         norm_xm_pred, norm_xm_evals = clu_lss.eval_cluster_xmeans()
+#         nhac_complete_pred, nhac_complete_evals = clu_lss.eval_cluster_hac(
+#                 linkage="complete")
+#         nhac_s_pred, nhac_s_evals = clu_lss.eval_cluster_hac(
+#                 linkage="single")
+#         nhac_a_pred, nhac_a_evals = clu_lss.eval_cluster_hac(
+#                 linkage="average")
+#         n_optics_pred, n_optics_evals = clu_lss.eval_cluster_optics()
+#         nhdp_pred, nhdp_evals = clu_lss.eval_cluster_hdp()
+#         ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
+# =============================================================================
+
+        norm_spk_pred, norm_spk_evals = clu_lss.evaluate(
+                alg_option=Clusterer.alg_spherical_k_means,
+                param_init="k-means++")
+
+        ispk_pred, ispk_evals = clu_lss.evaluate(
+                alg_option=Clusterer.alg_iterative_spherical_k_means,
+                param_init="k-means++")
+
+        norm_hdbscan_pred, norm_hdbscan_evals = clu_lss.evaluate(
+                alg_option=Clusterer.alg_h_dbscan)
+
+        norm_ms_pred, norm_ms_evals = clu_lss.evaluate(
+                alg_option=Clusterer.alg_mean_shift)
+
+        norm_xm_pred, norm_xm_evals = clu_lss.evaluate(
+                alg_option=Clusterer.alg_x_means)
+
+        nhac_complete_pred, nhac_complete_evals = clu_lss.evaluate(
+                alg_option=Clusterer.alg_hac,
+                param_linkage="complete")
+
+        nhac_s_pred, nhac_s_evals = clu_lss.evaluate(
+                alg_option=Clusterer.alg_hac,
+                param_linkage="single")
+
+        nhac_a_pred, nhac_a_evals = clu_lss.evaluate(
+                alg_option=Clusterer.alg_hac,
+                param_linkage="average")
+
+        n_optics_pred, n_optics_evals = clu_lss.evaluate(
+                alg_option=Clusterer.alg_optics)
+
         nhdp_pred, nhdp_evals = clu_lss.eval_cluster_hdp()
         ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
 
