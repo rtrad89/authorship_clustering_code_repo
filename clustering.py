@@ -430,7 +430,8 @@ class Clusterer:
             clustering_lables = self._cluster_optics()
 
         elif alg_option == Clusterer.alg_spherical_k_means:
-            clustering_lables = self._cluster_spherical_kmeans()
+            clustering_lables = self._cluster_spherical_kmeans(
+                    init=param_init)
 
         elif alg_option == Clusterer.alg_x_means:
             clustering_lables = self._cluster_xmeans()
@@ -438,106 +439,6 @@ class Clusterer:
         else:
             return None
 
-        predicted = pd.Series(index=self.data.index, data=clustering_lables,
-                              name="predicted")
-        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
-                                   sort=False)
-
-        return clustering_lables, self._eval_clustering(
-                aligned_labels.true,
-                aligned_labels.predicted)
-
-    def eval_cluster_hdbscan(self):
-        clustering_lables = self._cluster_hdbscan()
-        predicted = pd.Series(index=self.data.index, data=clustering_lables,
-                              name="predicted")
-        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
-                                   sort=False)
-
-        return clustering_lables, self._eval_clustering(
-                aligned_labels.true,
-                aligned_labels.predicted)
-
-    def eval_cluster_spherical_kmeans(self):
-        clustering_lables = self._cluster_spherical_kmeans()
-        predicted = pd.Series(index=self.data.index, data=clustering_lables,
-                              name="predicted")
-        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
-                                   sort=False)
-
-        return clustering_lables, self._eval_clustering(
-                aligned_labels.true,
-                aligned_labels.predicted)
-
-    def eval_cluster_ispherical_kmeans(self, init: str = "k-means++"):
-        clustering_lables = self._cluster_ispherical_kmeans(init=init)
-        predicted = pd.Series(index=self.data.index, data=clustering_lables,
-                              name="predicted")
-        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
-                                   sort=False)
-
-        return clustering_lables, self._eval_clustering(
-                aligned_labels.true,
-                aligned_labels.predicted)
-
-    def eval_cluster_mean_shift(self):
-        clustering_lables = self._cluster_mean_shift()
-        predicted = pd.Series(index=self.data.index, data=clustering_lables,
-                              name="predicted")
-        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
-                                   sort=False)
-
-        return clustering_lables, self._eval_clustering(
-                aligned_labels.true,
-                aligned_labels.predicted)
-
-    def eval_cluster_xmeans(self):
-        """
-        Evaluate the clustering of X-Means. Although it uses Euclidean metrics
-        under the hood, if the data is L2 normalised on the sample level, i.e.
-        the samples are projected onto an n-sphere, Euclidean distances resemb-
-        le angular distances now, a close approximation of the cosine distance
-        which suits directional data more.
-        """
-        clustering_lables = self._cluster_xmeans()
-        predicted = pd.Series(index=self.data.index, data=clustering_lables,
-                              name="predicted")
-        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
-                                   sort=False)
-
-        return clustering_lables, self._eval_clustering(
-                aligned_labels.true,
-                aligned_labels.predicted)
-
-    def eval_cluster_hac(self, linkage: str):
-        """
-        Execute and evaluate HAC clustering.
-
-        Parameters
-        ----------
-        k : int
-            The number of clusters to extract. If it is not specified then the
-            X-Means BIC scheme is exploited for this.
-        """
-
-        clustering_lables = self._cluster_hac(linkage=linkage)
-        predicted = pd.Series(index=self.data.index, data=clustering_lables,
-                              name="predicted")
-        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
-                                   sort=False)
-
-        return clustering_lables, self._eval_clustering(
-                aligned_labels.true,
-                aligned_labels.predicted)
-
-    def eval_cluster_optics(self, sil_scorer: bool = True):
-        """
-        Execute and evaluate OPTICS clustering.
-
-        """
-
-        clustering_lables = self._cluster_optics(
-                silhouette_scorer=sil_scorer)
         predicted = pd.Series(index=self.data.index, data=clustering_lables,
                               name="predicted")
         aligned_labels = pd.concat([self.true_labels, predicted], axis=1,

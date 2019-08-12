@@ -56,24 +56,6 @@ def problem_set_run(problem_set_id: int,
                             metric="cosine",
                             desired_n_clusters=n_clusters)
 
-        # spkmeans normalises by default using the l2 norm
-# =============================================================================
-#         norm_spk_pred, norm_spk_evals = clu_lss.eval_cluster_spherical_kmeans()
-#         ispk_pred, ispk_evals = clu_lss.eval_cluster_ispherical_kmeans()
-#         norm_hdbscan_pred, norm_hdbscan_evals = clu_lss.eval_cluster_hdbscan()
-#         norm_ms_pred, norm_ms_evals = clu_lss.eval_cluster_mean_shift()
-#         norm_xm_pred, norm_xm_evals = clu_lss.eval_cluster_xmeans()
-#         nhac_complete_pred, nhac_complete_evals = clu_lss.eval_cluster_hac(
-#                 linkage="complete")
-#         nhac_s_pred, nhac_s_evals = clu_lss.eval_cluster_hac(
-#                 linkage="single")
-#         nhac_a_pred, nhac_a_evals = clu_lss.eval_cluster_hac(
-#                 linkage="average")
-#         n_optics_pred, n_optics_evals = clu_lss.eval_cluster_optics()
-#         nhdp_pred, nhdp_evals = clu_lss.eval_cluster_hdp()
-#         ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
-# =============================================================================
-
         norm_spk_pred, norm_spk_evals = clu_lss.evaluate(
                 alg_option=Clusterer.alg_spherical_k_means,
                 param_init="k-means++")
@@ -157,7 +139,7 @@ if __name__ == "__main__":
         ks.append(1+max(clu.true_labels))
         k_vals.append(ks)
         print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬(Done)▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-    my_suffix = "_ispkmeansAdded"
+    my_suffix = "_training_data"
     info_json = r"..\..\Datasets\pan17_train\info.json"
     Tools.splice_save_problemsets_dictionaries(problemsets_results,
                                                metadata_fpath=info_json,
