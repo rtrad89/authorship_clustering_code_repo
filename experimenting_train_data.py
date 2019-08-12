@@ -58,7 +58,7 @@ def problem_set_run(problem_set_id: int,
 
         # spkmeans normalises by default using the l2 norm
         norm_spk_pred, norm_spk_evals = clu_lss.eval_cluster_spherical_kmeans()
-
+        ispk_pred, ispk_evals = clu_lss.eval_cluster_ispherical_kmeans()
         norm_hdbscan_pred, norm_hdbscan_evals = clu_lss.eval_cluster_hdbscan()
         norm_ms_pred, norm_ms_evals = clu_lss.eval_cluster_mean_shift()
         norm_xm_pred, norm_xm_evals = clu_lss.eval_cluster_xmeans()
@@ -68,20 +68,23 @@ def problem_set_run(problem_set_id: int,
                 linkage="single")
         nhac_a_pred, nhac_a_evals = clu_lss.eval_cluster_hac(
                 linkage="average")
+        n_optics_pred, n_optics_evals = clu_lss.eval_cluster_optics()
         nhdp_pred, nhdp_evals = clu_lss.eval_cluster_hdp()
         ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
 
         # Return the results:
         return (Tools.form_problemset_result_dictionary(
                 dictionaries=[
-                        norm_spk_evals, norm_hdbscan_evals,
+                        ispk_evals, norm_spk_evals, norm_hdbscan_evals,
                         norm_ms_evals, norm_xm_evals,
                         nhac_complete_evals, nhac_s_evals, nhac_a_evals,
+                        n_optics_evals,
                         nhdp_evals, ntrue_evals
                         ],
-                identifiers=["SPKMEANS", "HDBSCAN",
+                identifiers=["iSpKmeans", "SPKMEANS", "HDBSCAN",
                              "MeanShift", "XMEANS", "HAC_COMPLETE",
-                             "HAC_SINGLE", "HAC_AVERAGE", "HDP", "TRUE"],
+                             "HAC_SINGLE", "HAC_AVERAGE", "OPTICS",
+                             "HDP", "TRUE"],
                 problem_set=problem_set_id),
                 ground_truth,
                 lss_rep_docs,
@@ -117,8 +120,10 @@ if __name__ == "__main__":
         ks.append(1+max(clu.true_labels))
         k_vals.append(ks)
         print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬(Done)▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-    my_suffix = "_trying_gap_kmeans"
+    my_suffix = "_ispkmeansAdded"
+    info_json = r"..\..\Datasets\pan17_train\info.json"
     Tools.splice_save_problemsets_dictionaries(problemsets_results,
+                                               metadata_fpath=info_json,
                                                suffix=my_suffix)
     Tools.save_k_vals_as_df(k_vals=k_vals, suffix=my_suffix)
     print("Execution finished.")

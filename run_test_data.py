@@ -49,8 +49,8 @@ if __name__ == "__main__":
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
     for ps in range(1, 121):
-        print(f"Vectorising problem set ► {ps:03d} ◄ ..")
+        print(f"\nVectorising problem set ► {ps:03d} ◄ ..")
         plain_docs, bow_rep_docs, lss_rep_docs = tester.vectorise_ps(
                 ps,
-                infer_lss=True)
+                infer_lss=False)
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")

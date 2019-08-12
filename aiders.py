@@ -130,8 +130,27 @@ class Tools:
         return vec
 
     @staticmethod
+    def form_problemset_result_dictionary(dictionaries: List[Dict],
+                                          identifiers: List[str],
+                                          problem_set: int):
+        res = defaultdict(list)
+        res["set"].extend([f"problem{problem_set:03d}"] * len(dictionaries))
+        for i, d in enumerate(dictionaries):
+            res["algorithm"].append(identifiers[i])
+            for k in d.keys():
+                res[k].append(d[k])
+        return res
+
+    @staticmethod
     def splice_save_problemsets_dictionaries(ps_dicts: List[Dict],
+                                             metadata_fpath: str,
                                              suffix: str = ""):
+        """
+        Parameters
+        ----------
+        metadata_fpath : str
+            The path to the info.json file which accompanys the clustering.
+        """
         integrated_results = defaultdict(list)
         for r in ps_dicts:
             if r is None:
@@ -140,6 +159,12 @@ class Tools:
                 integrated_results[k].extend(r[k])
 
         df = pd.DataFrame(data=integrated_results)
+        # Merge them with metadata about the clusterings and remove last
+        # redundant column as well
+        metadata = pd.DataFrame(Tools._read_json_file(metadata_fpath))
+        df = df.merge(metadata,
+                      left_on="set",
+                      right_on="folder").iloc[:, 0:-1]
 
         if len(df) > 0:
             timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
@@ -147,18 +172,6 @@ class Tools:
             df.sort_values(by=["set", "bcubed_fscore"], ascending=[True, False]
                            ).to_csv(path_or_buf=path,
                                     index=False)
-
-    @staticmethod
-    def form_problemset_result_dictionary(dictionaries: List[Dict],
-                                          identifiers: List[str],
-                                          problem_set: int):
-        res = defaultdict(list)
-        res["set"].extend([problem_set] * len(dictionaries))
-        for i, d in enumerate(dictionaries):
-            res["algorithm"].append(identifiers[i])
-            for k in d.keys():
-                res[k].append(d[k])
-        return res
 
     @staticmethod
     def test_power_law_dist(true_labels_dir: str):

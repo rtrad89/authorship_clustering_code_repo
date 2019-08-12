@@ -4,7 +4,9 @@ Created on Tue Jul  9 19:25:40 2019
 
 @author: RTRAD
 """
-from sklearn.cluster import MeanShift, AgglomerativeClustering, OPTICS
+from sklearn.cluster import (MeanShift,
+                             AgglomerativeClustering,
+                             OPTICS, cluster_optics_dbscan)
 import hdbscan
 from pyclustering.cluster.xmeans import xmeans
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
@@ -17,7 +19,7 @@ from sklearn.metrics.cluster import (adjusted_mutual_info_score,
                                      calinski_harabasz_score,
                                      davies_bouldin_score)
 from typing import List, Dict, Set
-from numpy import place, column_stack, unique, inf
+from numpy import place, column_stack, unique, inf, arange
 import pandas as pd
 import bcubed
 from spherecluster import SphericalKMeans
@@ -183,9 +185,40 @@ class Clusterer:
 
         # Pay attention that k-means++ initialiser may be using Eucledian
         # distances still.. hence the "random" choice
-        skm = SphericalKMeans(n_clusters=self.k, init="k-means++", n_init=25,
-                              n_jobs=-1, random_state=13712, normalize=False)
+        skm = SphericalKMeans(n_clusters=self.k, init="k-means++", n_init=500,
+                              random_state=13712, normalize=False)
         return skm.fit_predict(self.data)
+
+    def _cluster_ispherical_kmeans(self,
+                                   init: str = "k-means++"):
+        """
+        Employ spherical k-means on L2 normalised directional data points in an
+        iterative manner to select the best k according to intrinsic clustering
+        evaluation measures.
+
+        Parameters
+        ----------
+        init: str
+            The initialisation method - "random" or "k-means++"
+
+        """
+        max_sil = -inf
+        best_pred = None
+        # Pay attention that k-means++ initialiser may be using Eucledian
+        # distances still.. hence the "random" choice
+        for ik in range(2, len(self.data) - 1):
+            skm = SphericalKMeans(n_clusters=ik, init=init, n_init=500,
+                                  random_state=13712, normalize=False)
+            pred = skm.fit_predict(self.data)
+            score = silhouette_score(X=self.data,
+                                     metric=self.distance_metric,
+                                     labels=pred,
+                                     random_state=13712)
+            if score > max_sil:
+                max_sil = score
+                best_pred = pred
+
+        return best_pred
 
     def _select_best_hac(self,
                          linkage: str,
@@ -216,14 +249,11 @@ class Clusterer:
                                           compute_full_tree=True,
                                           memory=r"./__cache__/")
             pred = hac.fit_predict(self.data)
-            if use_sil:
-                score = silhouette_score(X=self.data,
-                                         labels=pred,
-                                         metric=self.distance_metric,
-                                         random_state=13712)
-            else:
-                score = calinski_harabasz_score(
-                        X=self.data, labels=pred)
+
+            score = silhouette_score(X=self.data,
+                                     labels=pred,
+                                     metric=self.distance_metric,
+                                     random_state=13712)
 
             if verbose:
                 print(f"-► k={k:02} → score={score:.3f}")
@@ -252,6 +282,38 @@ class Clusterer:
         pred = hac.fit_predict(self.data)
 
         return pred
+
+    def _extract_best_optics(self, clusterer, use_sil: bool):
+        max_score = -inf
+        best_pred = None
+
+        for my_eps in arange(0.01, 0.5, 0.01):
+            pred = cluster_optics_dbscan(
+                    reachability=clusterer.reachability_,
+                    core_distances=clusterer.core_distances_,
+                    ordering=clusterer.ordering_, eps=my_eps)
+
+            if not len(unique(pred)) in (1, len(self.data)):
+
+                score = silhouette_score(X=self.data,
+                                         labels=pred,
+                                         metric=self.distance_metric,
+                                         random_state=13712)
+
+                if score > max_score:
+                    max_score = score
+                    best_pred = pred
+
+        return self._process_noise_as_singletons(best_pred)
+
+    def _cluster_optics(self,
+                        silhouette_scorer: bool = True):
+        optics = OPTICS(min_cluster_size=self.min_clu_size,
+                        min_samples=self.min_clu_size,
+                        metric=self.distance_metric,
+                        leaf_size=len(self.data))
+        optics.fit(X=self.data)
+        return self._extract_best_optics(optics, use_sil=silhouette_scorer)
 
     def _hdp_topic_clusters(self):
         """
@@ -339,6 +401,16 @@ class Clusterer:
 
         return ret
 
+    def evaluate(self, clustering_lables: List):
+        predicted = pd.Series(index=self.data.index, data=clustering_lables,
+                              name="predicted")
+        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
+                                   sort=False)
+
+        return clustering_lables, self._eval_clustering(
+                aligned_labels.true,
+                aligned_labels.predicted)
+
     def eval_cluster_hdbscan(self):
         clustering_lables = self._cluster_hdbscan()
         predicted = pd.Series(index=self.data.index, data=clustering_lables,
@@ -352,6 +424,17 @@ class Clusterer:
 
     def eval_cluster_spherical_kmeans(self):
         clustering_lables = self._cluster_spherical_kmeans()
+        predicted = pd.Series(index=self.data.index, data=clustering_lables,
+                              name="predicted")
+        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
+                                   sort=False)
+
+        return clustering_lables, self._eval_clustering(
+                aligned_labels.true,
+                aligned_labels.predicted)
+
+    def eval_cluster_ispherical_kmeans(self, init: str = "k-means++"):
+        clustering_lables = self._cluster_ispherical_kmeans(init=init)
         predicted = pd.Series(index=self.data.index, data=clustering_lables,
                               name="predicted")
         aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
@@ -402,6 +485,23 @@ class Clusterer:
         """
 
         clustering_lables = self._cluster_hac(linkage=linkage)
+        predicted = pd.Series(index=self.data.index, data=clustering_lables,
+                              name="predicted")
+        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
+                                   sort=False)
+
+        return clustering_lables, self._eval_clustering(
+                aligned_labels.true,
+                aligned_labels.predicted)
+
+    def eval_cluster_optics(self, sil_scorer: bool = True):
+        """
+        Execute and evaluate OPTICS clustering.
+
+        """
+
+        clustering_lables = self._cluster_optics(
+                silhouette_scorer=sil_scorer)
         predicted = pd.Series(index=self.data.index, data=clustering_lables,
                               name="predicted")
         aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
