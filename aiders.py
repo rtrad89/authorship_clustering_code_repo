@@ -44,6 +44,11 @@ class Tools:
                   "are not already opened")
 
     @staticmethod
+    def remove_directory(dir_path):
+        if os.path.exists(dir_path):
+            rmtree(dir_path)
+
+    @staticmethod
     def initialise_directories(dir_path):
         """
         Ensure an empty directory is created in `dir_path`.

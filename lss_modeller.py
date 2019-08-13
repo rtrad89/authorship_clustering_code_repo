@@ -9,8 +9,10 @@ from nltk.tokenize import word_tokenize
 from nltk.util import ngrams
 import time
 import pandas as pd
+from numpy import arange
 from aiders import Tools
 from typing import Tuple, List
+from collections import defaultdict
 
 
 class LssHdpModeller:
@@ -287,7 +289,9 @@ class LssOptimiser:
                  hdp_path: str,
                  ldac_filename: str,
                  hdp_seed: int,
-                 eta_range: List[int],
+                 eta_range: List[float],
+                 gamma_range: List[float],
+                 alpha_range: List[float],
                  out_dir: str,
                  hdp_iters: int = 1000
                  ):
@@ -296,6 +300,8 @@ class LssOptimiser:
         self.ldac = ldac_filename
         self.seed = hdp_seed
         self.etas = eta_range
+        self.gammas = gamma_range
+        self.alphas = alpha_range
         self.out_dir = out_dir
         self.iters = hdp_iters
 
@@ -482,6 +488,65 @@ class LssOptimiser:
                 index=False)
         return ret
 
+    def traverse_gamma_alpha(self,
+                             ps: int,
+                             tail_prcnt: float = 0.20,
+                             verbose: bool = True):
+        ldac_path = r"lda_c_format_HyperFalse\dummy_ldac_corpus.dat"
+        dat_path = f"{self.training_folder}\\problem{ps:03d}\\{ldac_path}"
+        directory = f"{self.out_dir}\\gamma_alpha"
+        path_executable = r"{}\hdp.exe".format(self.hdp_path)
+
+        res = defaultdict(list)
+        total_work = len(self.gammas)**2 * len(self.alphas)**2
+        c = 0
+        print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
+        for g_s in self.gammas:
+            for g_r in self.gammas:
+                for a_s in self.alphas:
+                    for a_r in self.alphas:
+                        c = c + 1
+                        progress = 100.0 * c / total_work
+                        if verbose:
+                            print(f"► Working on "
+                                  f"Gamma({g_s:0.2f},{g_r:0.2f}) "
+                                  f"and Alpha({a_s:0.2f},{a_r:0.2f}) "
+                                  f"[{progress:06.2f}%]")
+                        s.run([path_executable,
+                               "--algorithm",     "train",
+                               "--data",          dat_path,
+                               "--directory",     f"{directory}\\hdp_out{c}",
+                               "--max_iter",      str(500),
+                               "--sample_hyper",  "no",
+                               "--save_lag",      "-1",
+                               "--eta",           "0.5",
+                               "--random_seed",   str(self.seed),
+                               "--gamma_a",     str(g_s),
+                               "--gamma_b",     str(g_r),
+                               "--alpha_a",     str(a_s),
+                               "--alpha_b",     str(a_r)],
+                              check=True, capture_output=True, text=True)
+                        # Read the likelihood
+                        ll = pd.read_csv(
+                                f"{directory}\\hdp_out{c}\\state.log",
+                                delim_whitespace=True
+                                ).likelihood.tail(round(tail_prcnt * 500)
+                                                  ).mean()
+                        res["gamma_shape"].append(g_s)
+                        res["gamma_rate"].append(g_r)
+                        res["alpha_shape"].append(a_s)
+                        res["alpha_rate"].append(a_r)
+                        res["gamma"].append(g_s * g_r)
+                        res["alpha"].append(a_s * a_r)
+                        res["likelihood"].append(ll)
+        # Save the results to disk
+        df_res = pd.DataFrame(res)
+        df_res.to_csv(f"{directory}\\results.csv", index=False)
+        if verbose:
+            print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ Done ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
+#        Tools.remove_directory(f"{directory}\\hdp_out")
+        return df_res
+
 
 def main():
     print("Main thread started..\n")
@@ -494,14 +559,19 @@ def main():
                              ldac_filename="dummy_ldac_corpus.dat",
                              hdp_seed=1371224,
                              eta_range=[0.1, 0.3, 0.5, 0.8, 1],
+                             gamma_range=arange(0.05, 1.00, 0.3),
+                             alpha_range=arange(0.05, 1.00, 0.3),
                              out_dir=r"./__outputs__",
                              hdp_iters=10000)
 
-    ret = optimiser.assess_hyper_sampling(verbose=True)
-    print(ret)
+#    ret = optimiser.assess_hyper_sampling(verbose=True)
+#    print(ret)
+#
+#    ret_eta = optimiser.smartly_optimise_eta(tail_prcnt=0.25, verbose=True)
+#    print(ret_eta)
 
-    ret_eta = optimiser.smartly_optimise_eta(tail_prcnt=0.25, verbose=True)
-    print(ret_eta)
+    ret_gamma_alpha = optimiser.traverse_gamma_alpha(ps=12)
+    print(ret_gamma_alpha)
 
 
 if __name__ == "__main__":
