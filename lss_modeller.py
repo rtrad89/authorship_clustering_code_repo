@@ -9,10 +9,12 @@ from nltk.tokenize import word_tokenize
 from nltk.util import ngrams
 import time
 import pandas as pd
-from numpy import arange
+from itertools import product
 from aiders import Tools
 from typing import Tuple, List
 from collections import defaultdict
+import seaborn as sns
+sns.set()
 
 
 class LssHdpModeller:
@@ -389,49 +391,95 @@ class LssOptimiser:
                 f"{self.out_dir}/hyper_optimisation.csv", index=False)
         return dct
 
-    def _generate_etas_outputs(self,
+    def _generate_hdps_outputs(self,
+                               skip_factor: int = 1,
                                verbose: bool = False):
         st = time.perf_counter()
 
         ldac_path = r"lda_c_format_HyperFalse/dummy_ldac_corpus.dat"
-
+        size = ((60 // skip_factor)
+                * len(self.etas)
+                * len(self.gammas)**2
+                * len(self.alphas)**2)
+        i = 0
         with Tools.scan_directory(self.training_folder) as ps_folders:
-            for folder in ps_folders:
+            for c, folder in enumerate(ps_folders):
 
                 if not folder.name[0:7] == "problem":
                     if verbose:
                         print(f"→ Skipping {folder.name}")
                     continue
+                # Implement the skipping factor
+                if c % skip_factor != 0:
+                    continue
 
                 t = time.perf_counter()
                 for eta in self.etas:
-                    if verbose:
-                        print(f"► Applying HDP with eta={eta:0.1f}"
-                              f" on {folder.name}..")
+                    for g_s, g_r in product(self.gammas, repeat=2):
+                        for a_s, a_r in product(self.alphas, repeat=2):
+                            i = i + 1
+                            percentage = f"{100 * i / size:06.02f}"
+                            suff = (f"{g_s:0.2f}_{g_r:0.2f}_"
+                                    f"{a_s:0.2f}_{a_r:0.2f}")
+                            if verbose:
+                                print(f"► Applying HDP with "
+                                      f"eta={eta:0.1f} "
+                                      f"gamma({g_s:0.2f}, {g_r:0.2f}) "
+                                      f"alpha({a_s:0.2f}, {a_r:0.2f}) "
+                                      f"on {folder.name} [{percentage}%]")
 
-                    directory = (f"{self.out_dir}/eta_optimisation_"
-                                 f"{self.iters}itrs/{eta:0.1f}/{folder.name}")
-                    if (Tools.path_exists(directory)):
-                        if verbose:
-                            print("\tcached result found on disk")
-                        continue
+                            directory = (f"{self.out_dir}/optimisation"
+                                         f"/{eta:0.1f}__{suff}"
+                                         f"/{folder.name}")
 
-                    path_executable = r"{}\hdp.exe".format(self.hdp_path)
-                    data = f"{folder.path}/{ldac_path}"
+                            if (Tools.path_exists(directory)):
+                                if verbose:
+                                    print("\tcached result found at "
+                                          f"{directory}")
+                                continue
 
-                    # Prepare the output directory
-                    Tools.initialise_directories(directory)
+                            path_executable = r"{}\hdp.exe".format(
+                                    self.hdp_path)
+                            data = f"{folder.path}/{ldac_path}"
 
-                    s.run([path_executable,
-                           "--algorithm",     "train",
-                           "--data",          data,
-                           "--directory",     directory,
-                           "--max_iter",      str(self.iters),
-                           "--sample_hyper",  "no",
-                           "--save_lag",      "-1",
-                           "--eta",           str(eta),
-                           "--random_seed",   str(self.seed)],
-                          check=True, capture_output=True, text=True)
+                            # Prepare the output directory
+                            Tools.initialise_directories(directory)
+
+                            if self.seed is not None:
+                                s.run([path_executable,
+                                       "--algorithm",     "train",
+                                       "--data",          data,
+                                       "--directory",     directory,
+                                       "--max_iter",      str(self.iters),
+                                       "--sample_hyper",  "no",
+                                       "--save_lag",      "-1",
+                                       "--eta",           str(eta),
+                                       "--gamma_a",     str(g_s),
+                                       "--gamma_b",     str(g_r),
+                                       "--alpha_a",     str(a_s),
+                                       "--alpha_b",     str(a_r),
+                                       "--random_seed",   str(self.seed)],
+                                      stdout=s.DEVNULL,
+                                      check=True,
+                                      capture_output=False,
+                                      text=True)
+                            else:
+                                s.run([path_executable,
+                                       "--algorithm",     "train",
+                                       "--data",          data,
+                                       "--directory",     directory,
+                                       "--max_iter",      str(self.iters),
+                                       "--sample_hyper",  "no",
+                                       "--save_lag",      "-1",
+                                       "--eta",           str(eta),
+                                       "--gamma_a",     str(g_s),
+                                       "--gamma_b",     str(g_r),
+                                       "--alpha_a",     str(a_s),
+                                       "--alpha_b",     str(a_r)],
+                                      stdout=s.DEVNULL,
+                                      check=True,
+                                      capture_output=False,
+                                      text=True)
 
                 if verbose:
                     print(f"--- {folder.name} done in "
@@ -440,57 +488,60 @@ class LssOptimiser:
             period = round(time.perf_counter() - st, 2)
             print(f"▬▬▬▬▬ All done in {period} seconds ▬▬▬▬▬")
 
-    def smartly_optimise_eta(self,
-                             tail_prcnt: float,
-                             verbose: bool = True):
+    def smart_optimisation(self,
+                           tail_prcnt: float = 0.80,
+                           skip_factor: int = 1,
+                           verbose: bool = True):
         # First generate the outputs to compare:
-        self._generate_etas_outputs(verbose=verbose)
+        self._generate_hdps_outputs(skip_factor=skip_factor,
+                                    verbose=verbose)
 
         ret = {}
         # Loop over the outputs of different etas
-        for eta in self.etas:
-            master_folder = (f"{self.out_dir}/eta_optimisation_"
-                             f"{self.iters}itrs/{eta:0.1f}")
-            pw_ll = []
-            errors = []
-            with Tools.scan_directory(master_folder) as problems:
-                for problem in problems:
-                    try:
-                        path_table = (f"{problem.path}"
-                                      "/mode-word-assignments.dat")
-                        n_words = pd.read_csv(filepath_or_buffer=path_table,
-                                              delim_whitespace=True,
-                                              usecols=["w"],
-                                              squeeze=True).nunique()
-                        path_state = f"{problem.path}/state.log"
-                        df_state = pd.read_csv(filepath_or_buffer=path_state,
-                                               delim_whitespace=True,
-                                               index_col="iter",
-                                               usecols=["iter", "likelihood"],
-                                               squeeze=True)
-                        ll = df_state.tail(round(len(df_state) * tail_prcnt
-                                                 )).mean()
-                        pw_ll.append(ll / n_words)
-                    except FileNotFoundError as e:
-                        print(f"{e}")
-                        errors.append(f"{e}")
-                        continue
-            ret.update({f"eta_{eta:0.1f}":
-                        round(sum(pw_ll) / len(pw_ll), 4)})
+        master_folder = (f"{self.out_dir}\\optimisation")
+        pw_ll = []
+        errors = []
+        with Tools.scan_directory(master_folder) as perms:
+            for perm in perms:
+                with Tools.scan_directory(perm.path) as problems:
+                    for problem in problems:
+                        try:
+                            path_table = (f"{problem.path}"
+                                          "/mode-word-assignments.dat")
+                            n_words = pd.read_csv(
+                                    filepath_or_buffer=path_table,
+                                    delim_whitespace=True,
+                                    usecols=["w"],
+                                    squeeze=True).nunique()
+                            path_state = f"{problem.path}/state.log"
+                            df_state = pd.read_csv(
+                                    filepath_or_buffer=path_state,
+                                    delim_whitespace=True,
+                                    index_col="iter",
+                                    usecols=["iter", "likelihood"],
+                                    squeeze=True)
+                            ll = df_state.tail(round(
+                                    len(df_state) * tail_prcnt
+                                    )).mean()
+                            pw_ll.append(ll / n_words)
+                        except FileNotFoundError as e:
+                            print(f"{e}")
+                            errors.append(f"{e}")
+                            continue
+                ret.update({f"perm.name":
+                            round(sum(pw_ll) / len(pw_ll), 4)})
         # Save any encountered errors to disk too
         Tools.save_list_to_text(mylist=errors,
-                                filepath=(f"{self.out_dir}/eta_{self.iters}"
-                                          "iters_errors.txt")
-                                )
+                                filepath=(f"{self.out_dir}/opt_errors.txt"))
 
         pd.DataFrame(data=ret, index=[0]).to_csv(
-                f"{self.out_dir}/eta_optimisation_{self.iters}iters.csv",
+                f"{self.out_dir}/optimisation.csv",
                 index=False)
         return ret
 
     def traverse_gamma_alpha(self,
                              ps: int,
-                             tail_prcnt: float = 0.20,
+                             tail_prcnt: float = 0.80,
                              verbose: bool = True):
         ldac_path = r"lda_c_format_HyperFalse\dummy_ldac_corpus.dat"
         dat_path = f"{self.training_folder}\\problem{ps:03d}\\{ldac_path}"
@@ -501,44 +552,46 @@ class LssOptimiser:
         total_work = len(self.gammas)**2 * len(self.alphas)**2
         c = 0
         print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
-        for g_s in self.gammas:
-            for g_r in self.gammas:
-                for a_s in self.alphas:
-                    for a_r in self.alphas:
-                        c = c + 1
-                        progress = 100.0 * c / total_work
-                        if verbose:
-                            print(f"► Working on "
-                                  f"Gamma({g_s:0.2f},{g_r:0.2f}) "
-                                  f"and Alpha({a_s:0.2f},{a_r:0.2f}) "
-                                  f"[{progress:06.2f}%]")
-                        s.run([path_executable,
-                               "--algorithm",     "train",
-                               "--data",          dat_path,
-                               "--directory",     f"{directory}\\hdp_out{c}",
-                               "--max_iter",      str(500),
-                               "--sample_hyper",  "no",
-                               "--save_lag",      "-1",
-                               "--eta",           "0.5",
-                               "--random_seed",   str(self.seed),
-                               "--gamma_a",     str(g_s),
-                               "--gamma_b",     str(g_r),
-                               "--alpha_a",     str(a_s),
-                               "--alpha_b",     str(a_r)],
-                              check=True, capture_output=True, text=True)
-                        # Read the likelihood
-                        ll = pd.read_csv(
-                                f"{directory}\\hdp_out{c}\\state.log",
-                                delim_whitespace=True
-                                ).likelihood.tail(round(tail_prcnt * 500)
-                                                  ).mean()
-                        res["gamma_shape"].append(g_s)
-                        res["gamma_rate"].append(g_r)
-                        res["alpha_shape"].append(a_s)
-                        res["alpha_rate"].append(a_r)
-                        res["gamma"].append(g_s * g_r)
-                        res["alpha"].append(a_s * a_r)
-                        res["likelihood"].append(ll)
+        for g_s, g_r in product(self.gammas, repeat=2):
+            for a_s, a_r in product(self.alphas, repeat=2):
+                for a_r in self.alphas:
+                    c = c + 1
+                    progress = 100.0 * c / total_work
+                    suff = f"_{g_s:0.2f}_{g_r:0.2f}_{a_s:0.2f}_{a_r:0.2f}"
+                    if verbose:
+                        print(f"► Working on "
+                              f"Gamma({g_s:0.2f},{g_r:0.2f}) "
+                              f"and Alpha({a_s:0.2f},{a_r:0.2f}) "
+                              f"[{progress:06.2f}%]")
+                    s.run([path_executable,
+                           "--algorithm",     "train",
+                           "--data",          dat_path,
+                           "--directory",   (f"{directory}\\{c:03d}"
+                                             f"hdp_out{suff}"),
+                           "--max_iter",      str(500),
+                           "--sample_hyper",  "no",
+                           "--save_lag",      "-1",
+                           "--eta",           "0.5",
+                           "--random_seed",   str(self.seed),
+                           "--gamma_a",     str(g_s),
+                           "--gamma_b",     str(g_r),
+                           "--alpha_a",     str(a_s),
+                           "--alpha_b",     str(a_r)],
+                          check=True, capture_output=True, text=True)
+                    # Read the likelihood
+                    ll = pd.read_csv(
+                            (f"{directory}\\{c:03d}hdp_out{suff}"
+                             f"\\state.log"),
+                            delim_whitespace=True
+                            ).likelihood.tail(round(tail_prcnt * 500)
+                                              ).mean()
+                    res["gamma_shape"].append(g_s)
+                    res["gamma_rate"].append(g_r)
+                    res["alpha_shape"].append(a_s)
+                    res["alpha_rate"].append(a_r)
+                    res["gamma"].append(g_s * g_r)
+                    res["alpha"].append(a_s * a_r)
+                    res["likelihood"].append(ll)
         # Save the results to disk
         df_res = pd.DataFrame(res)
         df_res.to_csv(f"{directory}\\results.csv", index=False)
@@ -546,6 +599,28 @@ class LssOptimiser:
             print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ Done ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
 #        Tools.remove_directory(f"{directory}\\hdp_out")
         return df_res
+
+    def generate_gibbs_states_plots(self,
+                                    states_path: str):
+        Tools.initialise_directory(f"{states_path}\\plots")
+        size = len(self.gammas)**2 * len(self.alphas)**2
+        with Tools.scan_directory(states_path) as outputs:
+            for i, output in enumerate(outputs):
+                state_file = f"{output.path}\\state.log"
+                df = pd.read_csv(filepath_or_buffer=state_file,
+                                 delim_whitespace=True,
+                                 index_col="iter")
+                ax = sns.lineplot(x=df.index, y=df.likelihood, data=df)
+                ax.margins(x=0)
+                name = output.name
+                fig = ax.get_figure()
+                fig.savefig(
+                        f"{states_path}\\plots\\{name}.png",
+                        dpi=300,
+                        bbox_incehs="tight",
+                        format="png")
+                fig.clf()
+                print(f"{i} / {size} [{i/size:06.4f}]%")
 
 
 def main():
@@ -557,21 +632,28 @@ def main():
     optimiser = LssOptimiser(train_folders_path=folders_path,
                              hdp_path=hdp,
                              ldac_filename="dummy_ldac_corpus.dat",
-                             hdp_seed=1371224,
-                             eta_range=[0.1, 0.3, 0.5, 0.8, 1],
-                             gamma_range=arange(0.05, 1.00, 0.3),
-                             alpha_range=arange(0.05, 1.00, 0.3),
+                             hdp_seed=None,
+                             eta_range=[0.5, 2.5, 5],
+                             gamma_range=[0.1, 0.5],
+                             alpha_range=[0.05, 0.25],
                              out_dir=r"./__outputs__",
-                             hdp_iters=10000)
+                             hdp_iters=1000)
 
 #    ret = optimiser.assess_hyper_sampling(verbose=True)
 #    print(ret)
 #
-#    ret_eta = optimiser.smartly_optimise_eta(tail_prcnt=0.25, verbose=True)
-#    print(ret_eta)
+    ret_eta = optimiser.smart_optimisation(tail_prcnt=0.8,
+                                           skip_factor=5,
+                                           verbose=True)
+    print(ret_eta)
 
-    ret_gamma_alpha = optimiser.traverse_gamma_alpha(ps=12)
-    print(ret_gamma_alpha)
+#    ret_gamma_alpha = optimiser.traverse_gamma_alpha(ps=12)
+#    print(ret_gamma_alpha)
+
+#    print("Generating plots...")
+#    optimiser.generate_gibbs_states_plots(f"{optimiser.out_dir}\\gamma_alpha")
+
+    print("Done.")
 
 
 if __name__ == "__main__":
