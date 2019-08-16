@@ -243,7 +243,8 @@ class LssHdpModeller:
                    ).format(path))
             raise
 
-    def get_corpus_lss(self, infer_lss
+    def get_corpus_lss(self, infer_lss,
+                       bim_thresold: int = 0, bim: bool = False
                        ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Get high- and low-dimenstional representations of data.
@@ -277,7 +278,14 @@ class LssHdpModeller:
         else:
             bow_df, _, plain = self._convert_corpus_to_bow()
 
-        return plain, bow_df, self._load_lss_representation_into_df()
+        lss = self._load_lss_representation_into_df()
+        # Convert the BoT to BIM:
+        if bim:
+            if bim_thresold is None:
+                bim_thresold = pd.np.nanquantile(lss[lss > 0], .1)
+            lss = (lss > bim_thresold).astype(int)
+
+        return plain, bow_df, lss
 
 
 class LssOptimiser:
@@ -395,8 +403,9 @@ class LssOptimiser:
                                skip_factor: int = 1,
                                verbose: bool = False):
         st = time.perf_counter()
-
-        ldac_path = r"lda_c_format_HyperFalse/dummy_ldac_corpus.dat"
+        ldac_path = r"lda_c_format_HyperFalse\\dummy_ldac_corpus.dat"
+        words_nums = {}
+        vocab_file = r"lda_c_format_HyperFalse\\dummy_ldac_corpus.dat.vocab"
         size = ((60 // skip_factor)
                 * len(self.etas)
                 * len(self.gammas)**2
@@ -404,7 +413,6 @@ class LssOptimiser:
         i = 0
         with Tools.scan_directory(self.training_folder) as ps_folders:
             for c, folder in enumerate(ps_folders):
-
                 if not folder.name[0:7] == "problem":
                     if verbose:
                         print(f"→ Skipping {folder.name}")
@@ -417,6 +425,12 @@ class LssOptimiser:
                 for eta in self.etas:
                     for g_s, g_r in product(self.gammas, repeat=2):
                         for a_s, a_r in product(self.alphas, repeat=2):
+                            # Cache the number of words for later
+                            if folder.name not in words_nums:
+                                vocab_path = f"{folder.path}\\{vocab_file}"
+                                n_words = self._get_number_words(vocab_path)
+                                words_nums.update({folder.name: n_words})
+
                             i = i + 1
                             percentage = f"{100 * i / size:06.02f}"
                             suff = (f"{g_s:0.2f}_{g_r:0.2f}_"
@@ -484,17 +498,18 @@ class LssOptimiser:
                 if verbose:
                     print(f"--- {folder.name} done in "
                           f"{time.perf_counter() - t:0.1f} seconds ---")
-        if verbose:
-            period = round(time.perf_counter() - st, 2)
-            print(f"▬▬▬▬▬ All done in {period} seconds ▬▬▬▬▬")
+
+        period = round(time.perf_counter() - st, 2)
+        print(f"▬▬▬▬▬ Vectorisation done in {period} seconds ▬▬▬▬▬")
+        return words_nums
 
     def smart_optimisation(self,
                            tail_prcnt: float = 0.80,
                            skip_factor: int = 1,
-                           verbose: bool = True):
+                           verbose: bool = False):
         # First generate the outputs to compare:
-        self._generate_hdps_outputs(skip_factor=skip_factor,
-                                    verbose=verbose)
+        words_counts = self._generate_hdps_outputs(skip_factor=skip_factor,
+                                                   verbose=verbose)
 
         ret = {}
         # Loop over the outputs of different etas
@@ -503,17 +518,13 @@ class LssOptimiser:
         errors = []
         with Tools.scan_directory(master_folder) as perms:
             for perm in perms:
+                # generate plots
+                self.generate_gibbs_states_plots(states_path=perm.path)
                 with Tools.scan_directory(perm.path) as problems:
                     for problem in problems:
                         try:
-                            path_table = (f"{problem.path}"
-                                          "/mode-word-assignments.dat")
-                            n_words = pd.read_csv(
-                                    filepath_or_buffer=path_table,
-                                    delim_whitespace=True,
-                                    usecols=["w"],
-                                    squeeze=True).nunique()
-                            path_state = f"{problem.path}/state.log"
+                            n_words = words_counts[problem.name]
+                            path_state = f"{problem.path}\\state.log"
                             df_state = pd.read_csv(
                                     filepath_or_buffer=path_state,
                                     delim_whitespace=True,
@@ -528,15 +539,20 @@ class LssOptimiser:
                             print(f"{e}")
                             errors.append(f"{e}")
                             continue
-                ret.update({f"perm.name":
+                        except KeyError:
+                            # Plots folders are being queried for n_words
+                            continue
+                ret.update({f"{perm.name}":
                             round(sum(pw_ll) / len(pw_ll), 4)})
         # Save any encountered errors to disk too
         Tools.save_list_to_text(mylist=errors,
-                                filepath=(f"{self.out_dir}/opt_errors.txt"))
+                                filepath=(f"{self.out_dir}\\optimisation"
+                                          f"\\opt_errors.txt"))
 
         pd.DataFrame(data=ret, index=[0]).to_csv(
-                f"{self.out_dir}/optimisation.csv",
+                f"{self.out_dir}\\optimisation\\optimisation.csv",
                 index=False)
+
         return ret
 
     def traverse_gamma_alpha(self,
@@ -603,24 +619,26 @@ class LssOptimiser:
     def generate_gibbs_states_plots(self,
                                     states_path: str):
         Tools.initialise_directory(f"{states_path}\\plots")
-        size = len(self.gammas)**2 * len(self.alphas)**2
         with Tools.scan_directory(states_path) as outputs:
             for i, output in enumerate(outputs):
-                state_file = f"{output.path}\\state.log"
-                df = pd.read_csv(filepath_or_buffer=state_file,
-                                 delim_whitespace=True,
-                                 index_col="iter")
-                ax = sns.lineplot(x=df.index, y=df.likelihood, data=df)
-                ax.margins(x=0)
-                name = output.name
-                fig = ax.get_figure()
-                fig.savefig(
-                        f"{states_path}\\plots\\{name}.png",
-                        dpi=300,
-                        bbox_incehs="tight",
-                        format="png")
-                fig.clf()
-                print(f"{i} / {size} [{i/size:06.4f}]%")
+                try:
+                    state_file = f"{output.path}\\state.log"
+                    df = pd.read_csv(filepath_or_buffer=state_file,
+                                     delim_whitespace=True,
+                                     index_col="iter")
+                    ax = sns.lineplot(x=df.index, y=df.likelihood, data=df)
+                    ax.margins(x=0)
+                    name = output.name
+                    fig = ax.get_figure()
+                    fig.savefig(
+                            f"{states_path}\\plots\\{name}.png",
+                            dpi=300,
+                            bbox_incehs="tight",
+                            format="png")
+                    fig.clf()
+                    print(f"{i}")
+                except FileNotFoundError:
+                    print(f"→ Skipping {output.name}")
 
 
 def main():
@@ -636,7 +654,7 @@ def main():
                              eta_range=[0.5, 2.5, 5],
                              gamma_range=[0.1, 0.5],
                              alpha_range=[0.05, 0.25],
-                             out_dir=r"./__outputs__",
+                             out_dir=r".\\__outputs__",
                              hdp_iters=1000)
 
 #    ret = optimiser.assess_hyper_sampling(verbose=True)

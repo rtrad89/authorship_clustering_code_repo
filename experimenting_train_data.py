@@ -38,7 +38,8 @@ def problem_set_run(problem_set_id: int,
     try:
         # Load, project and visualise the data
         plain_docs, bow_rep_docs, lss_rep_docs = Modeller.get_corpus_lss(
-                infer_lss)
+                infer_lss,
+                bim=False)
 
         # Begin Clustering Attempts
         true_labels_path = (r"..\..\Datasets\pan17_train\truth"
@@ -47,7 +48,7 @@ def problem_set_run(problem_set_id: int,
 
         ground_truth = Tools.load_true_clusters_into_vector(true_labels_path)
 
-        # Normalise the data
+        # Normalise the data if not BIM is used!
         clu_lss = Clusterer(dtm=Tools.normalise_data(data=lss_rep_docs),
                             true_labels=ground_truth,
                             max_nbr_clusters=len(lss_rep_docs)-1,
@@ -139,7 +140,7 @@ if __name__ == "__main__":
         ks.append(1+max(clu.true_labels))
         k_vals.append(ks)
         print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬(Done)▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-    my_suffix = "_training_data"
+    my_suffix = "_training_data_bim"
     info_json = r"..\..\Datasets\pan17_train\info.json"
     Tools.splice_save_problemsets_dictionaries(problemsets_results,
                                                metadata_fpath=info_json,
