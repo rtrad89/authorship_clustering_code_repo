@@ -31,6 +31,9 @@ def problem_set_run(problem_set_id: int,
             hdp_iters=10000,
             hdp_seed=seed,
             hdp_sample_hyper=False,
+            hdp_eta=0.3,
+            hdp_gamma_s=0.1,
+            hdp_alpha_s=0.1,
             word_grams=1,
             verbose=verbose)
 
@@ -122,7 +125,7 @@ if __name__ == "__main__":
     problemsets_results = []
     k_vals = []
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-    for ps in range(1, 61):
+    for ps in range(1, 3):
         print(f"Executing on problem set ► {ps:03d} ◄ ..")
         ps_result, l, lss, plain, clu = problem_set_run(
             problem_set_id=ps,
@@ -133,14 +136,14 @@ if __name__ == "__main__":
             # runs and yield comparable results for our experiments
             # (comparing different runs of HDP on a problem set)
             seed=max(33, 70*(ps == 41)) + (3 * (ps in problematics)),
-            infer_lss=False,
+            infer_lss=True,
             verbose=False)
         problemsets_results.append(ps_result)
         ks = clu.cand_k.copy()
         ks.append(1+max(clu.true_labels))
         k_vals.append(ks)
         print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬(Done)▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-    my_suffix = "_training_data_bim"
+    my_suffix = "_training_data_sparse"
     info_json = r"..\..\Datasets\pan17_train\info.json"
     Tools.splice_save_problemsets_dictionaries(problemsets_results,
                                                metadata_fpath=info_json,

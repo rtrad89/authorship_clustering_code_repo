@@ -30,6 +30,8 @@ class LssHdpModeller:
                  hdp_seed: int,
                  word_grams: int,
                  hdp_eta: float = 0.5,
+                 hdp_gamma_s: float = 1.0,
+                 hdp_alpha_s: float = 1.0,
                  input_docs_path: str = None,
                  input_amazon_path: str = None,
                  input_amazon_fname: str = None,
@@ -51,11 +53,14 @@ class LssHdpModeller:
         self.input_amazon_path = input_amazon_path
         self.input_amazon_filename = input_amazon_fname
         self.lda_c_fname = ldac_filename
-        self.hdp_output_directory = f"{hdp_output_dir}_Hyper{hdp_sample_hyper}"
+        self.hdp_output_directory = (f"{hdp_output_dir}_{hdp_eta}"
+                                     f"_{hdp_gamma_s}_{hdp_alpha_s}")
         self.hdp_iterations = hdp_iters
         self.hdp_seed = hdp_seed
         self.hdp_hyper_sampling = hdp_sample_hyper
         self.hdp_eta = hdp_eta
+        self.hdp_gamma_s = hdp_gamma_s
+        self.hdp_alpha_s = hdp_alpha_s
         self.word_grams = word_grams
         self.doc_index = []  # the index of the files read for reference
         self.verbose = verbose
@@ -115,8 +120,11 @@ class LssHdpModeller:
         """ Convert a group of files LDA_C corpus and store it on disk"""
         bow_corpus, id2word_map, plain_docs = self._convert_corpus_to_bow()
         # Sterialise into LDA_C and store on disk
-        output_dir = r"{}\lda_c_format_Hyper{}".format(self.input_docs_path,
-                                                       self.hdp_hyper_sampling)
+        output_dir = r"{}\lda_c_format_{:0.1f}_{:0.1f}_{:0.1f}".format(
+                self.input_docs_path,
+                self.hdp_eta,
+                self.hdp_gamma_s,
+                self.hdp_alpha_s)
         Tools.initialise_directory(output_dir)
         save_location = r"{}\{}.dat".format(
                 output_dir, self.lda_c_fname)
@@ -125,37 +133,14 @@ class LssHdpModeller:
                 id2word=id2word_map)
         return plain_docs, bow_corpus
 
-    def _generate_lda_c_from_dataframe(self):
-        """
-        Convert a dataframe into LDA-C and save it to disk. The dataframe is
-        meant to be Amazon's labelled plain data loaded from a gzip file. An
-        additional column will be added to hold the BoW representation too.
-
-        Returns
-        -------
-        amazon_df : pd.DataFrame
-            A dataframe holding the plain documents and the BoW representation,
-            alongside authors (labels)
-
-        """
-
-        amazon_df, id2word_map = self._convert_series_to_bow()
-        # Sterialise it to disk as LDA-C
-        output_dir = r"{}\lda_c_format".format(self.input_amazon_path)
-        Tools.initialise_directory(output_dir)
-        save_location = r"{}\{}.dat".format(
-                output_dir, self.lda_c_fname)
-        bleicorpus.BleiCorpus.serialize(
-                fname=save_location, corpus=amazon_df.bow,
-                id2word=id2word_map)
-        return amazon_df
-
     def _invoke_gibbs_hdp(self):
         """Invoke Gibbs hdp posterior inference on the corpus"""
         path_executable = r"{}\hdp.exe".format(self.hdp_path)
-        param_data = r"{}\lda_c_format_Hyper{}\{}.dat".format(
+        param_data = r"{}\lda_c_format_{:0.1f}_{:0.1f}_{:0.1f}\{}.dat".format(
                 self.input_docs_path,
-                self.hdp_hyper_sampling,
+                self.hdp_eta,
+                self.hdp_gamma_s,
+                self.hdp_alpha_s,
                 self.lda_c_fname)
         param_directory = r"{}\{}".format(self.input_docs_path,
                                           self.hdp_output_directory)
@@ -171,7 +156,9 @@ class LssHdpModeller:
                      else "no",
                      "--save_lag",      "-1",
                      "--eta",           str(self.hdp_eta),
-                     "--random_seed",   str(self.hdp_seed)],
+                     "--random_seed",   str(self.hdp_seed),
+                     "--gamma_a",     str(self.hdp_gamma_s),
+                     "--alpha_a",     str(self.hdp_alpha_s)],
                     check=True, capture_output=True, text=True)
 
         return ret.stdout
@@ -406,10 +393,15 @@ class LssOptimiser:
         ldac_path = r"lda_c_format_HyperFalse\\dummy_ldac_corpus.dat"
         words_nums = {}
         vocab_file = r"lda_c_format_HyperFalse\\dummy_ldac_corpus.dat.vocab"
+#        size = ((60 // skip_factor)
+#                * len(self.etas)
+#                * len(self.gammas)**2
+#                * len(self.alphas)**2)
+        # Since we fixed the scales of Gammas
         size = ((60 // skip_factor)
                 * len(self.etas)
-                * len(self.gammas)**2
-                * len(self.alphas)**2)
+                * len(self.gammas)
+                * len(self.alphas))
         i = 0
         with Tools.scan_directory(self.training_folder) as ps_folders:
             for c, folder in enumerate(ps_folders):
@@ -422,9 +414,15 @@ class LssOptimiser:
                     continue
 
                 t = time.perf_counter()
+                # Fix the scale parameters for the Gamma priors
+                g_r = 1
+                a_r = 1
                 for eta in self.etas:
-                    for g_s, g_r in product(self.gammas, repeat=2):
-                        for a_s, a_r in product(self.alphas, repeat=2):
+                    # for g_s, g_r in product(self.gammas, repeat=2):
+                    # for a_s, a_r in product(self.alphas, repeat=2):
+                    # Only switch the shape parameter of Gammas
+                    for g_s in self.gammas:
+                        for a_s in self.alphas:
                             # Cache the number of words for later
                             if folder.name not in words_nums:
                                 vocab_path = f"{folder.path}\\{vocab_file}"
@@ -504,6 +502,7 @@ class LssOptimiser:
         return words_nums
 
     def smart_optimisation(self,
+                           plot_cat: str = "likelihood",
                            tail_prcnt: float = 0.80,
                            skip_factor: int = 1,
                            verbose: bool = False):
@@ -514,12 +513,19 @@ class LssOptimiser:
         ret = {}
         # Loop over the outputs of different etas
         master_folder = (f"{self.out_dir}\\optimisation")
+        log_likelihoods = []
+        avg_num_topics = []
+        std_num_topics = []
         pw_ll = []
         errors = []
         with Tools.scan_directory(master_folder) as perms:
             for perm in perms:
                 # generate plots
-                self.generate_gibbs_states_plots(states_path=perm.path)
+                if not Tools.is_path_dir(perm.path):
+                    continue
+
+                self.generate_gibbs_states_plots(states_path=perm.path,
+                                                 cat=plot_cat)
                 with Tools.scan_directory(perm.path) as problems:
                     for problem in problems:
                         try:
@@ -529,12 +535,23 @@ class LssOptimiser:
                                     filepath_or_buffer=path_state,
                                     delim_whitespace=True,
                                     index_col="iter",
-                                    usecols=["iter", "likelihood"],
-                                    squeeze=True)
-                            ll = df_state.tail(round(
+                                    usecols=["iter", "likelihood",
+                                             "num.topics"]
+                                    )
+                            ll = df_state.likelihood.tail(round(
                                     len(df_state) * tail_prcnt
                                     )).mean()
+                            avg_topics = df_state["num.topics"].tail(round(
+                                    len(df_state) * tail_prcnt
+                                    )).mean()
+                            std_topics = df_state["num.topics"].tail(round(
+                                    len(df_state) * tail_prcnt
+                                    )).std()
+
+                            log_likelihoods.append(ll)
                             pw_ll.append(ll / n_words)
+                            avg_num_topics.append(avg_topics)
+                            std_num_topics.append(std_topics)
                         except FileNotFoundError as e:
                             print(f"{e}")
                             errors.append(f"{e}")
@@ -543,15 +560,26 @@ class LssOptimiser:
                             # Plots folders are being queried for n_words
                             continue
                 ret.update({f"{perm.name}":
-                            round(sum(pw_ll) / len(pw_ll), 4)})
+                            [round(sum(log_likelihoods) / len(log_likelihoods),
+                                   4),
+                             round(sum(pw_ll) / len(pw_ll),
+                                   4),
+                             round(sum(avg_num_topics) / len(avg_num_topics),
+                                   4),
+                             round(sum(std_num_topics) / len(std_num_topics),
+                                   4)
+                             ]
+                            })
         # Save any encountered errors to disk too
         Tools.save_list_to_text(mylist=errors,
                                 filepath=(f"{self.out_dir}\\optimisation"
                                           f"\\opt_errors.txt"))
 
-        pd.DataFrame(data=ret, index=[0]).to_csv(
-                f"{self.out_dir}\\optimisation\\optimisation.csv",
-                index=False)
+        pd.DataFrame(data=ret,
+                     index=["Log-l", "PwLL", "T-Avg", "T-Std"]
+                     ).T.to_csv(
+                             f"{self.out_dir}\\optimisation\\optimisation.csv",
+                             index=True)
 
         return ret
 
@@ -617,8 +645,14 @@ class LssOptimiser:
         return df_res
 
     def generate_gibbs_states_plots(self,
-                                    states_path: str):
-        Tools.initialise_directory(f"{states_path}\\plots")
+                                    states_path: str,
+                                    cat: str = "likelihood"):
+        new_dir = f"{states_path}\\{cat}_plots"
+        if Tools.path_exists(new_dir):
+            print("Plots found, skipping..")
+            return
+
+        Tools.initialise_directory(new_dir)
         with Tools.scan_directory(states_path) as outputs:
             for i, output in enumerate(outputs):
                 try:
@@ -626,12 +660,12 @@ class LssOptimiser:
                     df = pd.read_csv(filepath_or_buffer=state_file,
                                      delim_whitespace=True,
                                      index_col="iter")
-                    ax = sns.lineplot(x=df.index, y=df.likelihood, data=df)
+                    ax = sns.lineplot(x=df.index, y=cat, data=df)
                     ax.margins(x=0)
                     name = output.name
                     fig = ax.get_figure()
                     fig.savefig(
-                            f"{states_path}\\plots\\{name}.png",
+                            f"{states_path}\\{cat}_plots\\{name}.png",
                             dpi=300,
                             bbox_incehs="tight",
                             format="png")
@@ -651,9 +685,9 @@ def main():
                              hdp_path=hdp,
                              ldac_filename="dummy_ldac_corpus.dat",
                              hdp_seed=None,
-                             eta_range=[0.5, 2.5, 5],
-                             gamma_range=[0.1, 0.5],
-                             alpha_range=[0.05, 0.25],
+                             eta_range=[0.3, 0.5, 0.8, 1],
+                             gamma_range=[0.1, 0.3, 0.5],
+                             alpha_range=[0.1, 0.3, 0.5],
                              out_dir=r".\\__outputs__",
                              hdp_iters=1000)
 
@@ -662,6 +696,7 @@ def main():
 #
     ret_eta = optimiser.smart_optimisation(tail_prcnt=0.8,
                                            skip_factor=5,
+                                           plot_cat="likelihood",
                                            verbose=True)
     print(ret_eta)
 

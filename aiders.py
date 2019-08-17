@@ -107,6 +107,10 @@ class Tools:
         return os.path.exists(path)
 
     @staticmethod
+    def is_path_dir(path):
+        return os.path.isdir(path)
+
+    @staticmethod
     def load_true_clusters_into_vector(path) -> pd.Series:
         """
         Load the true clustering json file into a series indexed by file names.
