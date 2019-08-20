@@ -153,7 +153,8 @@ class Tools:
     @staticmethod
     def splice_save_problemsets_dictionaries(ps_dicts: List[Dict],
                                              metadata_fpath: str,
-                                             suffix: str = ""):
+                                             suffix: str = "",
+                                             test_data: bool = False):
         """
         Parameters
         ----------
@@ -177,7 +178,10 @@ class Tools:
 
         if len(df) > 0:
             timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
-            path = f"./__outputs__/results_{timestamp}{suffix}.csv"
+            if test_data:
+                path = f"./__outputs__/TESTS/results_{timestamp}{suffix}.csv"
+            else:
+                path = f"./__outputs__/results_{timestamp}{suffix}.csv"
             df.sort_values(by=["set", "bcubed_fscore"], ascending=[True, False]
                            ).to_csv(path_or_buf=path,
                                     index=False)
@@ -236,14 +240,19 @@ class Tools:
 
     @staticmethod
     def save_k_vals_as_df(k_vals: List[List],
-                          suffix=""):
+                          suffix="",
+                          test_data: bool = False):
         df_k_vals = pd.DataFrame(k_vals,
                                  columns=["bic", "gap", "gmeans",
                                           "hac_c", "hac_s", "hac_a",
                                           "true"])
 
         timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
-        path = f"./__outputs__/k_trend_{timestamp}{suffix}.csv"
+        if test_data:
+            path = f"./__outputs__/TESTS/k_trend_{timestamp}{suffix}.csv"
+        else:
+            path = f"./__outputs__/k_trend_{timestamp}{suffix}.csv"
+
         df_k_vals.to_csv(path)
 
 

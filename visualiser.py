@@ -44,31 +44,31 @@ class Visualiser():
             for b in a:
                 b.margins(x=0)
 
+        ax[0, 0].set_title("(a)")
         sns.lineplot(ax=ax[0, 0],
                      data=df,
                      x="iter",
                      y="num.topics")
-        ax[0, 0].title.set_text("(a)")
 
+        ax[0, 1].set_title("(b)")
         sns.lineplot(ax=ax[0, 1],
                      data=df,
                      x="iter",
                      y="num.tables")
-        ax[0, 1].title.set_text("(b)")
 
+        ax[1, 0].set_title("(c)")
         sns.distplot(ax=ax[1, 0],
                      a=df["num.topics"],
                      bins=df["num.topics"].nunique(),
                      kde=True,
                      kde_kws={"bw": 1})
-        ax[1, 0].title.set_text("(c)")
 
+        ax[1, 1].set_title("(d)")
         sns.distplot(ax=ax[1, 1],
                      a=df["num.tables"],
                      bins=df["num.tables"].nunique(),
                      kde=True,
                      kde_kws={"bw": 1})
-        ax[1, 1].title.set_text("(d)")
 
         plt.tight_layout()
 

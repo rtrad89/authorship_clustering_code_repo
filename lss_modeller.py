@@ -51,8 +51,9 @@ class LssHdpModeller:
         self.hdp_path = hdp_path
         self.input_docs_path = input_docs_path
         self.lda_c_fname = ldac_filename
-        self.hdp_output_directory = (f"{hdp_output_dir}_{hdp_eta}"
-                                     f"_{hdp_gamma_s}_{hdp_alpha_s}")
+        self.hdp_output_directory = (f"{hdp_output_dir}_{hdp_eta:0.2f}"
+                                     f"_{hdp_gamma_s:0.2f}_{hdp_alpha_s:0.2f}"
+                                     f"_common_{drop_uncommon}")
         self.hdp_iterations = hdp_iters
         self.hdp_seed = hdp_seed
         self.hdp_hyper_sampling = hdp_sample_hyper
@@ -129,11 +130,12 @@ class LssHdpModeller:
         """ Convert a group of files LDA_C corpus and store it on disk"""
         bow_corpus, id2word_map, plain_docs = self._convert_corpus_to_bow()
         # Sterialise into LDA_C and store on disk
-        output_dir = r"{}\lda_c_format_{:0.1f}_{:0.1f}_{:0.1f}".format(
-                self.input_docs_path,
-                self.hdp_eta,
-                self.hdp_gamma_s,
-                self.hdp_alpha_s)
+        output_dir = (r"{}\lda_c_format_{:0.1f}_{:0.1f}"
+                      r"_{:0.1f}_common_{}").format(self.input_docs_path,
+                                                    self.hdp_eta,
+                                                    self.hdp_gamma_s,
+                                                    self.hdp_alpha_s,
+                                                    self.drop_uncommon)
         Tools.initialise_directory(output_dir)
         save_location = r"{}\{}.dat".format(
                 output_dir, self.lda_c_fname)
@@ -146,30 +148,47 @@ class LssHdpModeller:
     def _invoke_gibbs_hdp(self):
         """Invoke Gibbs hdp posterior inference on the corpus"""
         path_executable = r"{}\hdp.exe".format(self.hdp_path)
-        param_data = r"{}\lda_c_format_{:0.1f}_{:0.1f}_{:0.1f}\{}.dat".format(
+        param_data = (r"{}\lda_c_format_{:0.1f}_{:0.1f}"
+                      r"_{:0.1f}_common_{}\{}.dat").format(
                 self.input_docs_path,
                 self.hdp_eta,
                 self.hdp_gamma_s,
                 self.hdp_alpha_s,
+                self.drop_uncommon,
                 self.lda_c_fname)
+
         param_directory = r"{}\{}".format(self.input_docs_path,
                                           self.hdp_output_directory)
         # Prepare the output directory
         Tools.initialise_directory(param_directory)
 
-        ret = s.run([path_executable,
-                     "--algorithm",     "train",
-                     "--data",          param_data,
-                     "--directory",     param_directory,
-                     "--max_iter",      str(self.hdp_iterations),
-                     "--sample_hyper",  "yes" if self.hdp_hyper_sampling
-                     else "no",
-                     "--save_lag",      "-1",
-                     "--eta",           str(self.hdp_eta),
-                     "--random_seed",   str(self.hdp_seed),
-                     "--gamma_a",     str(self.hdp_gamma_s),
-                     "--alpha_a",     str(self.hdp_alpha_s)],
-                    check=True, capture_output=True, text=True)
+        if self.hdp_seed is not None and self.hdp_seed > 0:
+            ret = s.run([path_executable,
+                         "--algorithm",     "train",
+                         "--data",          param_data,
+                         "--directory",     param_directory,
+                         "--max_iter",      str(self.hdp_iterations),
+                         "--sample_hyper",  "yes" if self.hdp_hyper_sampling
+                         else "no",
+                         "--save_lag",      "-1",
+                         "--eta",           str(self.hdp_eta),
+                         "--random_seed",   str(self.hdp_seed),
+                         "--gamma_a",     str(self.hdp_gamma_s),
+                         "--alpha_a",     str(self.hdp_alpha_s)],
+                        check=True, capture_output=True, text=True)
+        else:
+            ret = s.run([path_executable,
+                         "--algorithm",     "train",
+                         "--data",          param_data,
+                         "--directory",     param_directory,
+                         "--max_iter",      str(self.hdp_iterations),
+                         "--sample_hyper",  "yes" if self.hdp_hyper_sampling
+                         else "no",
+                         "--save_lag",      "-1",
+                         "--eta",           str(self.hdp_eta),
+                         "--gamma_a",     str(self.hdp_gamma_s),
+                         "--alpha_a",     str(self.hdp_alpha_s)],
+                        check=True, capture_output=True, text=True)
 
         return ret.stdout
 
