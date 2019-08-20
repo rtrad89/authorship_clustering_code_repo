@@ -246,6 +246,7 @@ class Tools:
         path = f"./__outputs__/k_trend_{timestamp}{suffix}.csv"
         df_k_vals.to_csv(path)
 
+
 def main():
     print("Aiders here")
     exit(0)

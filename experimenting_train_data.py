@@ -26,15 +26,17 @@ def problem_set_run(problem_set_id: int,
             hdp_path=r"..\hdps\hdp",
             input_docs_path=r"..\..\Datasets\pan17_train\problem{}".format(
                     problem_nbr),
-            ldac_filename=r"dummy_ldac_corpus",
-            hdp_output_dir=r"hdp_lss",
+            ldac_filename=r"ldac_corpus_common_2",
+            hdp_output_dir=r"hdp_lss_common_2",
             hdp_iters=10000,
             hdp_seed=seed,
             hdp_sample_hyper=False,
-            hdp_eta=0.3,
-            hdp_gamma_s=0.1,
-            hdp_alpha_s=0.1,
+            hdp_eta=0.5,
+            hdp_gamma_s=1,
+            hdp_alpha_s=1,
             word_grams=1,
+            drop_uncommon=True,
+            freq_threshold=2,
             verbose=verbose)
 
     # Infer the BoW and LSS representations of the documents
@@ -64,9 +66,9 @@ def problem_set_run(problem_set_id: int,
                 alg_option=Clusterer.alg_spherical_k_means,
                 param_init="k-means++")
 
-        ispk_pred, ispk_evals = clu_lss.evaluate(
-                alg_option=Clusterer.alg_iterative_spherical_k_means,
-                param_init="k-means++")
+#        ispk_pred, ispk_evals = clu_lss.evaluate(
+#                alg_option=Clusterer.alg_iterative_spherical_k_means,
+#                param_init="k-means++")
 
         norm_hdbscan_pred, norm_hdbscan_evals = clu_lss.evaluate(
                 alg_option=Clusterer.alg_h_dbscan)
@@ -98,13 +100,15 @@ def problem_set_run(problem_set_id: int,
         # Return the results:
         return (Tools.form_problemset_result_dictionary(
                 dictionaries=[
-                        ispk_evals, norm_spk_evals, norm_hdbscan_evals,
+                        # ispk_evals, norm_spk_evals, norm_hdbscan_evals,
+                        norm_spk_evals, norm_hdbscan_evals,
                         norm_ms_evals, norm_xm_evals,
                         nhac_complete_evals, nhac_s_evals, nhac_a_evals,
                         n_optics_evals,
                         nhdp_evals, ntrue_evals
                         ],
-                identifiers=["iSpKmeans", "SPKMEANS", "HDBSCAN",
+                identifiers=[  # "iSpKmeans",
+                             "SPKMEANS", "HDBSCAN",
                              "MeanShift", "XMEANS", "HAC_COMPLETE",
                              "HAC_SINGLE", "HAC_AVERAGE", "OPTICS",
                              "HDP", "TRUE"],
@@ -121,11 +125,11 @@ def problem_set_run(problem_set_id: int,
 if __name__ == "__main__":
     # A list of problem sets where the random seed 33 wasn't compatible with
     # hyper sampling being on, so results were produced but not saved
-    problematics = [15, 30, 45, 51, 56, 59, 60]
+    problematics = [15, 30, 34, 45, 51, 56, 59, 60]
     problemsets_results = []
     k_vals = []
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-    for ps in range(1, 3):
+    for ps in range(1, 61):
         print(f"Executing on problem set ► {ps:03d} ◄ ..")
         ps_result, l, lss, plain, clu = problem_set_run(
             problem_set_id=ps,
@@ -143,7 +147,7 @@ if __name__ == "__main__":
         ks.append(1+max(clu.true_labels))
         k_vals.append(ks)
         print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬(Done)▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-    my_suffix = "_training_data_sparse"
+    my_suffix = "_training_data_common_2"
     info_json = r"..\..\Datasets\pan17_train\info.json"
     Tools.splice_save_problemsets_dictionaries(problemsets_results,
                                                metadata_fpath=info_json,

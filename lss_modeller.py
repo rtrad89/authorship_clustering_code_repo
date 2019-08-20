@@ -29,12 +29,12 @@ class LssHdpModeller:
                  hdp_sample_hyper: bool,
                  hdp_seed: int,
                  word_grams: int,
+                 drop_uncommon: bool = False,
+                 freq_threshold: int = 0,
                  hdp_eta: float = 0.5,
                  hdp_gamma_s: float = 1.0,
                  hdp_alpha_s: float = 1.0,
                  input_docs_path: str = None,
-                 input_amazon_path: str = None,
-                 input_amazon_fname: str = None,
                  verbose: bool = False):
         """Default Constructor
 
@@ -50,8 +50,6 @@ class LssHdpModeller:
 
         self.hdp_path = hdp_path
         self.input_docs_path = input_docs_path
-        self.input_amazon_path = input_amazon_path
-        self.input_amazon_filename = input_amazon_fname
         self.lda_c_fname = ldac_filename
         self.hdp_output_directory = (f"{hdp_output_dir}_{hdp_eta}"
                                      f"_{hdp_gamma_s}_{hdp_alpha_s}")
@@ -62,6 +60,8 @@ class LssHdpModeller:
         self.hdp_gamma_s = hdp_gamma_s
         self.hdp_alpha_s = hdp_alpha_s
         self.word_grams = word_grams
+        self.drop_uncommon = drop_uncommon
+        self.freq_th = freq_threshold
         self.doc_index = []  # the index of the files read for reference
         self.verbose = verbose
 
@@ -108,10 +108,19 @@ class LssHdpModeller:
                  ngrams(word_tokenize(d.lower()), self.word_grams)]
                 for d in plain_documents if len(d) > 3]
 
+        if self.drop_uncommon:
+            freq = defaultdict(int)
+            for doc in tokenised_corpus:
+                for word in doc:
+                    freq[word] += 1
+            tokenised_corpus = [
+                    [w for w in doc if freq[w] > self.freq_th]
+                    for doc in tokenised_corpus]
         # Form the word ids dictionary for vectorisation
         dictionary = Dictionary(tokenised_corpus)
-        bow_corpus = [dictionary.doc2bow(t_d) for t_d in tokenised_corpus]
-        return(bow_corpus,
+        corpus = [dictionary.doc2bow(t_d) for t_d in tokenised_corpus]
+
+        return(corpus,
                dictionary,
                pd.DataFrame(data=plain_documents, index=self.doc_index,
                             columns=["content"]))
@@ -128,6 +137,7 @@ class LssHdpModeller:
         Tools.initialise_directory(output_dir)
         save_location = r"{}\{}.dat".format(
                 output_dir, self.lda_c_fname)
+
         bleicorpus.BleiCorpus.serialize(
                 fname=save_location, corpus=bow_corpus,
                 id2word=id2word_map)
@@ -696,7 +706,7 @@ def main():
 #
     ret_eta = optimiser.smart_optimisation(tail_prcnt=0.8,
                                            skip_factor=5,
-                                           plot_cat="likelihood",
+                                           plot_cat="num.tables",
                                            verbose=True)
     print(ret_eta)
 
