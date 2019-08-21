@@ -64,18 +64,21 @@ class TestApproach:
 
     def _get_ps_truth(self, ps: int):
         true_labels_path = (r"..\..\Datasets\pan17_test\truth"
-                            r"\problem{}\clustering.json"
+                            r"\problem{:03d}\clustering.json"
                             ).format(ps)
         return Tools.load_true_clusters_into_vector(true_labels_path)
 
-    def _cluster_data(self, ps: int, data: List[List]):
+    def _cluster_data(self, ps: int,
+                      data: List[List],
+                      ground_truth: List,
+                      desired_k: int):
         clu_lss = Clusterer(dtm=data,
                             true_labels=ground_truth,
-                            max_nbr_clusters=len(lss_rep_docs)-1,
+                            max_nbr_clusters=len(data)-1,
                             min_nbr_clusters=1,
                             min_cluster_size=2,
                             metric="cosine",
-                            desired_n_clusters=None)
+                            desired_n_clusters=desired_k)
 
         norm_spk_pred, norm_spk_evals = clu_lss.evaluate(
                 alg_option=Clusterer.alg_spherical_k_means,
@@ -134,7 +137,7 @@ class TestApproach:
                       k_values: List[List]):
 
         Tools.splice_save_problemsets_dictionaries(
-                problemsets_results,
+                results,
                 metadata_fpath=info_path,
                 suffix=suffix,
                 test_data=True)
@@ -144,7 +147,11 @@ class TestApproach:
     def run_test(self,
                  configuration: str,
                  drop_uncommon: bool,
-                 save_name_suff: str):
+                 save_name_suff: str,
+                 infer: bool,
+                 desired_k: int  # If 0, true k will be used, None = estimation
+                 ):
+
         # Adjust the parameters according to the preference
         if configuration == TestApproach.config_sparse:
             eta = 0.3
@@ -163,9 +170,9 @@ class TestApproach:
         k_vals = []
         for ps in range(1, 121):
             print(f"Vectorising problem set ► {ps:03d} ◄ ..")
-            plain_docs, bow_rep_docs, lss_rep_docs = tester.vectorise_ps(
+            plain_docs, bow_rep_docs, lss_rep_docs = tester._vectorise_ps(
                     ps,
-                    infer_lss=False,
+                    infer_lss=infer,
                     hdp_eta=eta,
                     hdp_gamma_s=gamma,
                     hdp_alpha_s=alpha,
@@ -174,15 +181,18 @@ class TestApproach:
 
             # Begin Clustering Attempts
             print("\nClustering ..")
-            ps_res, k_trends = tester.cluster_data(ps, lss_rep_docs)
+            ground_truth = self._get_ps_truth(ps)
+            ps_res, k_trends = tester._cluster_data(ps, data=lss_rep_docs,
+                                                    ground_truth=ground_truth,
+                                                    desired_k=desired_k)
             problemsets_results.append(ps_res)
             k_vals.append(k_trends)
 
         print("\nSaving Results ..")
-        tester.save_results(suffix=save_name_suff,
-                            info_path=r"..\..\Datasets\pan17_test\info.json",
-                            results=problemsets_results,
-                            k_values=k_vals)
+        tester._save_results(suffix=f"{save_name_suff}_{configuration}",
+                             info_path=r"..\..\Datasets\pan17_test\info.json",
+                             results=problemsets_results,
+                             k_values=k_vals)
 
 
 if __name__ == "__main__":
@@ -191,31 +201,46 @@ if __name__ == "__main__":
                           sampling_iters=10000)
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-    problemsets_results = []
-    k_vals = []
-    for ps in range(1, 121):
-        print(f"Vectorising problem set ► {ps:03d} ◄ ..")
-        plain_docs, bow_rep_docs, lss_rep_docs = tester.vectorise_ps(
-                ps,
-                infer_lss=False,
-                hdp_eta=0.5,
-                hdp_gamma_s=1.0,
-                hdp_alpha_s=1.0,
-                drop_uncommon_terms=True)
-        lss_rep_docs = Tools.normalise_data(lss_rep_docs)
-
-        ground_truth = tester.get_ps_truth(ps)
-
-        # Begin Clustering Attempts
-        print("\nClustering ..")
-        ps_res, k_trends = tester.cluster_data(ps, lss_rep_docs)
-        problemsets_results.append(ps_res)
-        k_vals.append(k_trends)
-
-    print("\nSaving Results ..")
-    tester.save_results(suffix="_normal_drop_1",
-                        info_path=r"..\..\Datasets\pan17_test\info.json",
-                        results=problemsets_results,
-                        k_values=k_vals)
+#    problemsets_results = []
+#    k_vals = []
+#    for ps in range(1, 121):
+#        print(f"Vectorising problem set ► {ps:03d} ◄ ..")
+#        plain_docs, bow_rep_docs, lss_rep_docs = tester.vectorise_ps(
+#                ps,
+#                infer_lss=False,
+#                hdp_eta=0.5,
+#                hdp_gamma_s=1.0,
+#                hdp_alpha_s=1.0,
+#                drop_uncommon_terms=True)
+#        lss_rep_docs = Tools.normalise_data(lss_rep_docs)
+#
+#        ground_truth = tester.get_ps_truth(ps)
+#
+#        # Begin Clustering Attempts
+#        print("\nClustering ..")
+#        ps_res, k_trends = tester.cluster_data(ps, lss_rep_docs)
+#        problemsets_results.append(ps_res)
+#        k_vals.append(k_trends)
+#
+#    print("\nSaving Results ..")
+#    tester.save_results(suffix="_normal_drop_1",
+#                        info_path=r"..\..\Datasets\pan17_test\info.json",
+#                        results=problemsets_results,
+#                        k_values=k_vals)
+    tester.run_test(configuration=TestApproach.config_sparse,
+                    drop_uncommon=True,
+                    save_name_suff="_final",
+                    infer=True,
+                    desired_k=None)
+    tester.run_test(configuration=TestApproach.config_neutral,
+                    drop_uncommon=True,
+                    save_name_suff="_final",
+                    infer=True,
+                    desired_k=None)
+    tester.run_test(configuration=TestApproach.config_dense,
+                    drop_uncommon=True,
+                    save_name_suff="_final",
+                    infer=True,
+                    desired_k=None)
 
     print("\n▬▬▬▬▬▬▬▬▬▬▬▬(FINISHED)▬▬▬▬▬▬▬▬▬▬▬")

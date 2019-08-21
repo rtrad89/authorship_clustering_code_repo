@@ -72,9 +72,68 @@ class Visualiser():
 
         plt.tight_layout()
 
+    def analyse_results(self,
+                        save_dir: str,
+                        sparse_path: str,
+                        neutral_path: str,
+                        dense_path: str):
+
+        df_neutral_res = pd.read_csv(neutral_path, low_memory=False)
+        df_neutral_res = df_neutral_res[df_neutral_res.algorithm != "TRUE"]
+        df_sparse_res = pd.read_csv(sparse_path, low_memory=False)
+        df_sparse_res = df_sparse_res[df_sparse_res.algorithm != "TRUE"]
+        df_dense_res = pd.read_csv(dense_path, low_memory=False)
+        df_dense_res = df_dense_res[df_dense_res.algorithm != "TRUE"]
+
+        df_all = pd.concat(
+                [df_neutral_res, df_sparse_res, df_dense_res],
+                axis=0,
+                keys=["Neutral", "Sparse", "Dense"]
+                ).reset_index(level=0).rename(
+                        columns={"level_0": "topics_prior"})
+
+        fig_overall, ax_overall = plt.subplots(nrows=2,
+                                               ncols=1,
+                                               clear=True,
+                                               figsize=(9, 15))
+        sns.barplot(x="algorithm", y="bcubed_fscore", hue="topics_prior",
+                    data=df_all,
+                    capsize=0.05,
+                    ax=ax_overall[0])
+        sns.barplot(x="algorithm", y="ari", hue="topics_prior",
+                    data=df_all,
+                    capsize=0.05,
+                    ax=ax_overall[1])
+
+        # Rotate the x labels:
+        for ax in fig_overall.axes:
+            plt.sca(ax)
+            ax.set_xlabel("")
+            plt.xticks(rotation=90)
+        plt.tight_layout()
+
+        return df_all
+
 
 if __name__ == "__main__":
     vis = Visualiser(out_dir="./__output__/vis")
     s = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets\pan17_train"
-         r"\problem001\hdp_lss_common_0.5_1_1\state.log")
-    vis.plot_gibbs_trace(data=s)
+         r"\problem001\hdp_lss_0.50_1.00_1.00_common_True\state.log")
+#    vis.plot_gibbs_trace(data=s)
+
+    neutral_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+                    r"\authorship_clustering_code_repo\__outputs__"
+                    r"\results_20190820_213150_training_neutral_common.csv")
+
+    sparse_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+                   r"\authorship_clustering_code_repo\__outputs__"
+                   r"\results_20190821_132024_training_sparse_common.csv")
+
+    dense_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+                  r"\authorship_clustering_code_repo\__outputs__"
+                  r"\results_20190820_230536_training_dense_common.csv")
+
+    df = vis.analyse_results(save_dir="",
+                             sparse_path=sparse_path,
+                             neutral_path=neutral_path,
+                             dense_path=dense_path)

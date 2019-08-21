@@ -311,7 +311,11 @@ class Clusterer:
                     max_score = score
                     best_pred = pred
 
-        return self._process_noise_as_singletons(best_pred)
+        if best_pred is not None:
+            return self._process_noise_as_singletons(best_pred)
+        else:
+            # All outputs are either one cluster or n clusters
+            return self._process_noise_as_singletons(pred)
 
     def _cluster_optics(self):
         optics = OPTICS(min_cluster_size=self.min_clu_size,
@@ -413,38 +417,42 @@ class Clusterer:
                  param_init: str = None):
 
         if alg_option == Clusterer.alg_h_dbscan:
-            clustering_lables = self._cluster_hdbscan()
+            clustering_labels = self._cluster_hdbscan()
 
         elif alg_option == Clusterer.alg_hac:
-            clustering_lables = self._cluster_hac(
+            clustering_labels = self._cluster_hac(
                     linkage=param_linkage)
 
         elif alg_option == Clusterer.alg_iterative_spherical_k_means:
-            clustering_lables = self._cluster_ispherical_kmeans(
+            clustering_labels = self._cluster_ispherical_kmeans(
                     init=param_init)
 
         elif alg_option == Clusterer.alg_mean_shift:
-            clustering_lables = self._cluster_mean_shift()
+            clustering_labels = self._cluster_mean_shift()
 
         elif alg_option == Clusterer.alg_optics:
-            clustering_lables = self._cluster_optics()
+            clustering_labels = self._cluster_optics()
 
         elif alg_option == Clusterer.alg_spherical_k_means:
-            clustering_lables = self._cluster_spherical_kmeans(
+            clustering_labels = self._cluster_spherical_kmeans(
                     init=param_init)
 
         elif alg_option == Clusterer.alg_x_means:
-            clustering_lables = self._cluster_xmeans()
+            clustering_labels = self._cluster_xmeans()
 
         else:
             return None
 
-        predicted = pd.Series(index=self.data.index, data=clustering_lables,
-                              name="predicted")
-        aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
-                                   sort=False)
+        if clustering_labels is not None:
+            predicted = pd.Series(index=self.data.index,
+                                  data=clustering_labels,
+                                  name="predicted")
+            aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
+                                       sort=False)
+        else:
+            return None, None
 
-        return clustering_lables, self._eval_clustering(
+        return clustering_labels, self._eval_clustering(
                 aligned_labels.true,
                 aligned_labels.predicted)
 
