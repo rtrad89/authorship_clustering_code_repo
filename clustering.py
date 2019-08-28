@@ -279,11 +279,12 @@ class Clusterer:
         if self.estimated_k:
             hac_k, _, pred = self._select_best_hac(linkage=linkage,
                                                    verbose=False)
+            self.cand_k.append(hac_k)
+            # Use an average of all the methods for the estimation
             k = round((hac_k + sum(self.cand_k)) / (1+len(self.cand_k)))
         else:
             k = self.k
 
-        self.cand_k.append(k)
         hac = AgglomerativeClustering(n_clusters=k,
                                       affinity=self.distance_metric,
                                       linkage=linkage)
@@ -295,6 +296,7 @@ class Clusterer:
         max_score = -inf
         best_pred = None
 
+        # Traverse epsilon to detect the best cut
         for my_eps in arange(0.01, 0.5, 0.01):
             pred = cluster_optics_dbscan(
                     reachability=clusterer.reachability_,

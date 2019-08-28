@@ -255,6 +255,11 @@ class Tools:
 
         df_k_vals.to_csv(path)
 
+    @staticmethod
+    def calc_rmse(x: pd.Series,
+                  y: pd.Series):
+        return ((x - y) ** 2).mean() ** .5
+
 
 def main():
     print("Aiders here")

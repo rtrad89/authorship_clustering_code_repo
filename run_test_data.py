@@ -111,8 +111,11 @@ class TestApproach:
         nhdp_pred, nhdp_evals = clu_lss.eval_cluster_hdp()
         ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
 
-        k_trend = clu_lss.cand_k
-        k_trend.append(1 + max(clu_lss.true_labels))
+        if desired_k != 0:
+            k_trend = clu_lss.cand_k
+            k_trend.append(1 + max(clu_lss.true_labels))
+        else:
+            k_trend = [1 + max(clu_lss.true_labels)] * 7
 
         result = Tools.form_problemset_result_dictionary(
                 dictionaries=[
@@ -201,46 +204,45 @@ if __name__ == "__main__":
                           sampling_iters=10000)
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-#    problemsets_results = []
-#    k_vals = []
-#    for ps in range(1, 121):
-#        print(f"Vectorising problem set ► {ps:03d} ◄ ..")
-#        plain_docs, bow_rep_docs, lss_rep_docs = tester.vectorise_ps(
-#                ps,
-#                infer_lss=False,
-#                hdp_eta=0.5,
-#                hdp_gamma_s=1.0,
-#                hdp_alpha_s=1.0,
-#                drop_uncommon_terms=True)
-#        lss_rep_docs = Tools.normalise_data(lss_rep_docs)
-#
-#        ground_truth = tester.get_ps_truth(ps)
-#
-#        # Begin Clustering Attempts
-#        print("\nClustering ..")
-#        ps_res, k_trends = tester.cluster_data(ps, lss_rep_docs)
-#        problemsets_results.append(ps_res)
-#        k_vals.append(k_trends)
-#
-#    print("\nSaving Results ..")
-#    tester.save_results(suffix="_normal_drop_1",
-#                        info_path=r"..\..\Datasets\pan17_test\info.json",
-#                        results=problemsets_results,
-#                        k_values=k_vals)
-    tester.run_test(configuration=TestApproach.config_sparse,
-                    drop_uncommon=True,
-                    save_name_suff="_final",
-                    infer=True,
-                    desired_k=None)
+
+    print("========== NEUTRAL ==========")
     tester.run_test(configuration=TestApproach.config_neutral,
                     drop_uncommon=True,
                     save_name_suff="_final",
-                    infer=True,
+                    infer=False,
                     desired_k=None)
+    print("========== DENSE ==========")
     tester.run_test(configuration=TestApproach.config_dense,
                     drop_uncommon=True,
                     save_name_suff="_final",
-                    infer=True,
+                    infer=False,
                     desired_k=None)
+    print("========== SPARSE ==========")
+    tester.run_test(configuration=TestApproach.config_sparse,
+                    drop_uncommon=True,
+                    save_name_suff="_final",
+                    infer=False,
+                    desired_k=None)
+
+    print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬Using True K ▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
+
+    print("========== NEUTRAL-K ==========")
+    tester.run_test(configuration=TestApproach.config_neutral,
+                    drop_uncommon=True,
+                    save_name_suff="_final_trueK",
+                    infer=False,
+                    desired_k=0)
+    print("========== DENSE-K ==========")
+    tester.run_test(configuration=TestApproach.config_dense,
+                    drop_uncommon=True,
+                    save_name_suff="_final_trueK",
+                    infer=False,
+                    desired_k=0)
+    print("========== SPARSE-K ==========")
+    tester.run_test(configuration=TestApproach.config_sparse,
+                    drop_uncommon=True,
+                    save_name_suff="_final_trueK",
+                    infer=False,
+                    desired_k=0)
 
     print("\n▬▬▬▬▬▬▬▬▬▬▬▬(FINISHED)▬▬▬▬▬▬▬▬▬▬▬")
