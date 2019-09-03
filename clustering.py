@@ -105,9 +105,10 @@ class Clusterer:
         gmeans = GMeans(random_state=137, max_depth=500)
         gmeans.fit(self.data)
         k_gaussian = len(unique(gmeans.labels_))
+        est_k = round((k_bic + k_gap + k_gaussian) / 3)
 
-        return (round((k_bic + k_gap + k_gaussian) / 3),
-                [k_bic, k_gap, k_gaussian])
+        return (est_k,
+                [est_k, k_bic, k_gap, k_gaussian])
 
     def _process_noise_as_singletons(self, result: List):
         place(result, result == -1,
@@ -282,6 +283,8 @@ class Clusterer:
             self.cand_k.append(hac_k)
             # Use an average of all the methods for the estimation
             k = round((hac_k + sum(self.cand_k)) / (1+len(self.cand_k)))
+            # Append the calculated average
+            self.cand_k.append(k)
         else:
             k = self.k
 

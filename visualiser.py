@@ -86,6 +86,7 @@ class Visualiser():
         plt.close()
 
     def analyse_results(self,
+                        concise: bool,
                         sparse_path: str,
                         neutral_path: str,
                         dense_path: str,
@@ -97,6 +98,18 @@ class Visualiser():
         df_sparse_res = df_sparse_res[df_sparse_res.algorithm != "Labels"]
         df_dense_res = pd.read_csv(dense_path, low_memory=False)
         df_dense_res = df_dense_res[df_dense_res.algorithm != "Labels"]
+
+        # Filter out redundant algorithms:
+        if concise:
+            df_neutral_res = df_neutral_res[
+                    ~df_neutral_res.algorithm.isin(
+                            ["HDBSCAN", "HAC_Single", "HAC_Average"])]
+            df_sparse_res = df_sparse_res[
+                    ~df_sparse_res.algorithm.isin(
+                            ["HDBSCAN", "HAC_Single", "HAC_Average"])]
+            df_dense_res = df_dense_res[
+                    ~df_dense_res.algorithm.isin(
+                            ["HDBSCAN", "HAC_Single", "HAC_Average"])]
 
         df_all = pd.concat(
                 [df_neutral_res, df_sparse_res, df_dense_res],
@@ -130,19 +143,29 @@ class Visualiser():
         plt.close()
 
         fig_genre_lang, ax_genre_lang = plt.subplots(nrows=2,
-                                                     ncols=1,
+                                                     ncols=2,
                                                      clear=True,
-                                                     figsize=self.portrait)
+                                                     figsize=self.landscape)
         sns.barplot(x="language", y="bcubed_fscore", hue="algorithm",
                     data=df_sparse_res,
                     errwidth=self.error_width,
                     capsize=self.error_cap_size,
-                    ax=ax_genre_lang[0])
+                    ax=ax_genre_lang[0, 0])
+        sns.barplot(x="genre", y="bcubed_fscore", hue="algorithm",
+                    data=df_sparse_res,
+                    errwidth=self.error_width,
+                    capsize=self.error_cap_size,
+                    ax=ax_genre_lang[0, 1])
+        sns.barplot(x="language", y="ari", hue="algorithm",
+                    data=df_sparse_res,
+                    errwidth=self.error_width,
+                    capsize=self.error_cap_size,
+                    ax=ax_genre_lang[1, 0])
         sns.barplot(x="genre", y="ari", hue="algorithm",
                     data=df_sparse_res,
                     errwidth=self.error_width,
                     capsize=self.error_cap_size,
-                    ax=ax_genre_lang[1])
+                    ax=ax_genre_lang[1, 1])
 
         plt.legend(loc="lower left")
         plt.tight_layout()
@@ -195,7 +218,6 @@ class Visualiser():
         for ax in fig_comb_genre_lang.axes:
             plt.sca(ax)
             ax.set_xlabel("")
-            ax.set
             plt.xticks(rotation=90)
         plt.legend(loc="lower left")
         plt.tight_layout()
@@ -211,9 +233,21 @@ class Visualiser():
         return df_all
 
     def analyse_k_trends(self,
+                         concise: bool,
                          k_vals_path: str,
                          key_suff: str):
-        k_vals = pd.read_csv(k_vals_path, low_memory=False, index_col=0)
+        if concise:
+            k_vals = pd.read_csv(k_vals_path, low_memory=False,
+                                 usecols=["est_k", "bic", "gap",
+                                          "gmeans", "hac_c", "est_avg_c",
+                                          "true"])
+        else:
+            k_vals = pd.read_csv(k_vals_path, low_memory=False, index_col=0)
+
+        # FOR TRIAL
+#        k_vals["ex_bic_avg"] = .5 * (k_vals["gap"] + k_vals["gmeans"])
+#        k_vals["ex_bic_hac_avg"] = (k_vals["gap"] + k_vals["gmeans"]
+#                                    + k_vals["hac_c"]) / 3
 
         fig, ax = plt.subplots(nrows=2,
                                ncols=3,
@@ -221,30 +255,29 @@ class Visualiser():
                                figsize=self.landscape,
                                sharex="col")
 
-        sns.scatterplot(x="true", y="bic", color=".0",
+        sns.scatterplot(x="true", y="est_k", color=".0",
                         marker="X",
                         ax=ax[0, 0],
                         data=k_vals)
-        sns.scatterplot(x="true", y="gap", color=".0",
-                        marker="^",
-                        ax=ax[0, 1],
-                        data=k_vals)
-        sns.scatterplot(x="true", y="gmeans", color=".0",
-                        marker="v",
-                        ax=ax[0, 2],
-                        data=k_vals)
+
         sns.scatterplot(x="true", y="hac_c", color=".0",
                         marker="P",
                         ax=ax[1, 0],
                         data=k_vals)
-        sns.scatterplot(x="true", y="hac_s", color=".0",
-                        marker="s",
-                        ax=ax[1, 1],
+        sns.scatterplot(x="true", y="est_avg_c", color=".0",
+                        marker="^",
+                        ax=ax[0, 1],
                         data=k_vals)
-        sns.scatterplot(x="true", y="hac_a", color=".0",
-                        marker="o",
-                        ax=ax[1, 2],
-                        data=k_vals)
+
+        if not concise:
+            sns.scatterplot(x="true", y="hac_s", color=".0",
+                            marker="s",
+                            ax=ax[1, 1],
+                            data=k_vals)
+            sns.scatterplot(x="true", y="hac_a", color=".0",
+                            marker="o",
+                            ax=ax[1, 2],
+                            data=k_vals)
 
         plt.tight_layout()
         plt.show()
@@ -253,7 +286,7 @@ class Visualiser():
         # Plot the RMSE trends
         rmse = {}
         for col in k_vals.columns:
-            if col == "true":
+            if col in ["true"]:
                 continue
             rmse.update({col: Tools.calc_rmse(k_vals.true, k_vals[col])})
 
@@ -262,6 +295,11 @@ class Visualiser():
 
         fig_rmse, ax_rmse = plt.subplots(clear=True, figsize=self.single)
         sns.barplot(x=df_rmse.index, y="RMSE", data=df_rmse, ax=ax_rmse)
+
+        # Rotate the x axes
+        for ax in fig_rmse.axes:
+            plt.sca(ax)
+            plt.xticks(rotation=90)
         plt.tight_layout()
         plt.show()
         plt.close()
@@ -281,14 +319,15 @@ class Visualiser():
             return
 
         # Append date:
-        ts = pd.to_datetime("now").strftime("%Y%m%d%H%s")
+        ts = pd.to_datetime("now").strftime("%Y%m%d%H%S")
         out_dir = f"{out_dir}\\{name}_{ts}"
         Tools.initialise_directories(out_dir)
         for fk in self.figs.keys():
             figure = self.figs[fk]
-            figure.savefig(fname=f"{out_dir}\\{fk}.pdf",
+            figure.savefig(fname=f"{out_dir}\\{fk}.{charts_format}",
                            dpi=dpi,
                            format=charts_format,
+                           transparent=False,  # EPS doesn't support it already
                            metadata={"Author": "Rafi Trad"})
         # Clear the cache
         if flush:
@@ -297,25 +336,87 @@ class Visualiser():
 
 if __name__ == "__main__":
     # Locate the files to analyse:
+    # First the training data
+    sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+              r"\authorship_clustering_code_repo\__outputs__"
+              r"\results_20190902_235056_training_sparse_common.csv")
+    dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+             r"\authorship_clustering_code_repo\__outputs__"
+             r"\results_20190902_235509_training_dense_common.csv")
+    neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+               r"\authorship_clustering_code_repo\__outputs__"
+               r"\results_20190902_233804_training_neutral_common.csv")
+
+    k_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+                r"\authorship_clustering_code_repo\__outputs__"
+                r"\k_trend_20190902_235056_training_sparse_common.csv")
+    k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+               r"\authorship_clustering_code_repo\__outputs__"
+               r"\k_trend_20190902_235509_training_dense_common.csv")
+    k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+                 r"\authorship_clustering_code_repo\__outputs__"
+                 r"\k_trend_20190902_233804_training_neutral_common.csv")
+
+    trace_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
+                    r"\pan17_train\problem015"
+                    r"\hdp_lss_0.30_0.10_0.10_common_True"
+                    r"\state.log")
+    trace_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
+                   r"\pan17_train\problem015"
+                   r"\hdp_lss_0.80_1.50_1.50_common_True"
+                   r"\state.log")
+    trace_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
+                     r"\pan17_train\problem015"
+                     r"\hdp_lss_0.50_1.00_1.00_common_True"
+                     r"\state.log")
+
+    # Analyse charts and construct the cached pool:
+    vis = Visualiser(scale=1.25)
+
+    vis.analyse_results(concise=True,
+                        sparse_path=sparse,
+                        dense_path=dense,
+                        neutral_path=neutral,
+                        key_suff="_training_est_k")
+
+    vis.analyse_k_trends(concise=True,
+                         k_vals_path=k_sparse,
+                         key_suff="_training_sparse")
+    vis.plot_gibbs_trace(state_path=trace_sparse,
+                         key_suff="_training_sparse")
+
+    vis.analyse_k_trends(concise=True,
+                         k_vals_path=k_dense,
+                         key_suff="_training_dense")
+    vis.plot_gibbs_trace(state_path=trace_dense,
+                         key_suff="_training_dense")
+
+    vis.analyse_k_trends(concise=True,
+                         k_vals_path=k_neutral,
+                         key_suff="_training_neutral")
+    vis.plot_gibbs_trace(state_path=trace_neutral,
+                         key_suff="_training_neutral")
+
+    # Now the test data
     sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
               r"\authorship_clustering_code_repo\__outputs__\TESTS"
-              r"\results_20190822_164451_final_sparse.csv")
+              r"\results_20190903_003327_final_sparse.csv")
     dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
              r"\authorship_clustering_code_repo\__outputs__\TESTS"
-             r"\results_20190822_161946_final_dense.csv")
+             r"\results_20190903_001458_final_dense.csv")
     neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__\TESTS"
-               r"\results_20190822_160958_final_neutral.csv")
+               r"\results_20190903_000722_final_neutral.csv")
 
     k_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                 r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                r"\k_trend_20190822_164451_final_sparse.csv")
+                r"\k_trend_20190903_003327_final_sparse.csv")
     k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__\TESTS"
-               r"\k_trend_20190822_161946_final_dense.csv")
+               r"\k_trend_20190903_001458_final_dense.csv")
     k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                  r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                 r"\k_trend_20190822_160958_final_neutral.csv")
+                 r"\k_trend_20190903_000722_final_neutral.csv")
 
     trace_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
                     r"\pan17_test\problem015\lss_0.30_0.10_0.10_common_True"
@@ -329,40 +430,42 @@ if __name__ == "__main__":
 
     sparse_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                      r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                     r"\results_20190822_165610_final_trueK_sparse.csv")
+                     r"\results_20190903_141821_final_trueK_sparse.csv")
     dense_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                     r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                    r"\results_20190822_165225_final_trueK_dense.csv")
+                    r"\results_20190903_141459_final_trueK_dense.csv")
     neutral_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                       r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                      r"\results_20190822_164853_final_trueK_neutral.csv")
+                      r"\results_20190903_141125_final_trueK_neutral.csv")
 
-    # Analyse charts and construct the cached pool:
-    vis = Visualiser(scale=1.25)
-
-    vis.analyse_results(sparse_path=sparse,
+    vis.analyse_results(concise=True,
+                        sparse_path=sparse,
                         dense_path=dense,
                         neutral_path=neutral,
                         key_suff="_est_k")
 
-    vis.analyse_k_trends(k_vals_path=k_sparse,
+    vis.analyse_k_trends(concise=True,
+                         k_vals_path=k_sparse,
                          key_suff="_sparse")
     vis.plot_gibbs_trace(state_path=trace_sparse,
                          key_suff="_sparse")
 
-    vis.analyse_k_trends(k_vals_path=k_dense,
+    vis.analyse_k_trends(concise=True,
+                         k_vals_path=k_dense,
                          key_suff="_dense")
     vis.plot_gibbs_trace(state_path=trace_dense,
                          key_suff="_dense")
 
-    vis.analyse_k_trends(k_vals_path=k_neutral,
+    vis.analyse_k_trends(concise=True,
+                         k_vals_path=k_neutral,
                          key_suff="_neutral")
     vis.plot_gibbs_trace(state_path=trace_neutral,
                          key_suff="_neutral")
 
-    vis.analyse_results(sparse_path=sparse_true_k,
+    vis.analyse_results(concise=True,
+                        sparse_path=sparse_true_k,
                         dense_path=dense_true_k,
                         neutral_path=neutral_true_k,
                         key_suff="_true_k")
     # Serialise the cached pool to disk
-#    vis.serialise_figs()
+#    vis.serialise_figs(charts_format="eps")

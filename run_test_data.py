@@ -115,7 +115,7 @@ class TestApproach:
             k_trend = clu_lss.cand_k
             k_trend.append(1 + max(clu_lss.true_labels))
         else:
-            k_trend = [1 + max(clu_lss.true_labels)] * 7
+            k_trend = [1 + max(clu_lss.true_labels)] * 11
 
         result = Tools.form_problemset_result_dictionary(
                 dictionaries=[
@@ -205,26 +205,28 @@ if __name__ == "__main__":
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
-    print("========== NEUTRAL ==========")
-    tester.run_test(configuration=TestApproach.config_neutral,
-                    drop_uncommon=True,
-                    save_name_suff="_final",
-                    infer=False,
-                    desired_k=None)
-    print("========== DENSE ==========")
-    tester.run_test(configuration=TestApproach.config_dense,
-                    drop_uncommon=True,
-                    save_name_suff="_final",
-                    infer=False,
-                    desired_k=None)
-    print("========== SPARSE ==========")
-    tester.run_test(configuration=TestApproach.config_sparse,
-                    drop_uncommon=True,
-                    save_name_suff="_final",
-                    infer=False,
-                    desired_k=None)
-
-    print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬Using True K ▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
+# =============================================================================
+#     print("========== NEUTRAL ==========")
+#     tester.run_test(configuration=TestApproach.config_neutral,
+#                     drop_uncommon=True,
+#                     save_name_suff="_final",
+#                     infer=False,
+#                     desired_k=None)
+#     print("========== DENSE ==========")
+#     tester.run_test(configuration=TestApproach.config_dense,
+#                     drop_uncommon=True,
+#                     save_name_suff="_final",
+#                     infer=False,
+#                     desired_k=None)
+#     print("========== SPARSE ==========")
+#     tester.run_test(configuration=TestApproach.config_sparse,
+#                     drop_uncommon=True,
+#                     save_name_suff="_final",
+#                     infer=False,
+#                     desired_k=None)
+#
+#     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬Using True K ▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
+# =============================================================================
 
     print("========== NEUTRAL-K ==========")
     tester.run_test(configuration=TestApproach.config_neutral,

@@ -243,8 +243,11 @@ class Tools:
                           suffix="",
                           test_data: bool = False):
         df_k_vals = pd.DataFrame(k_vals,
-                                 columns=["bic", "gap", "gmeans",
-                                          "hac_c", "hac_s", "hac_a",
+                                 columns=["est_k",
+                                          "bic", "gap", "gmeans",
+                                          "hac_c", "est_avg_c",
+                                          "hac_s", "est_avg_s",
+                                          "hac_a", "est_avg_a",
                                           "true"])
 
         timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
