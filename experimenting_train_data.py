@@ -115,6 +115,12 @@ def problem_set_run(problem_set_id: int,
         n_optics_pred, n_optics_evals = clu_lss.evaluate(
                 alg_option=Clusterer.alg_optics)
 
+        # Baselines
+        bl_rand_pred, bl_rand_evals = clu_lss.evaluate(
+                alg_option=Clusterer.bl_random)
+        bl_singleton_pred, bl_singleton_evals = clu_lss.evaluate(
+                alg_option=Clusterer.bl_singleton)
+
         nhdp_pred, nhdp_evals = clu_lss.eval_cluster_hdp()
         ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
 
@@ -125,13 +131,14 @@ def problem_set_run(problem_set_id: int,
                         norm_spk_evals, norm_hdbscan_evals,
                         norm_ms_evals, norm_xm_evals,
                         nhac_complete_evals, nhac_s_evals, nhac_a_evals,
-                        n_optics_evals,
+                        n_optics_evals, bl_rand_evals, bl_singleton_evals,
                         nhdp_evals, ntrue_evals
                         ],
                 identifiers=[  # "iSpKmeans",
                              "Spherical_KMeans", "HDBSCAN",
                              "Mean_Shift", "XMeans", "HAC_Complete",
                              "HAC_Single", "HAC_Average", "OPTICS",
+                             "BL_random", "BL_singleton",
                              "HDP", "Labels"],
                 problem_set=problem_set_id),
                 ground_truth,

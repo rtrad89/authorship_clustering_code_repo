@@ -25,6 +25,7 @@ import bcubed
 from spherecluster import SphericalKMeans
 from gap_statistic import OptimalK
 from gmeans import GMeans
+import random
 
 
 class Clusterer:
@@ -36,6 +37,8 @@ class Clusterer:
     alg_iterative_spherical_k_means = 5
     alg_hac = 6
     alg_optics = 7
+    bl_random = 8
+    bl_singleton = 9
 
     def __init__(self,
                  dtm: List[List],
@@ -330,6 +333,15 @@ class Clusterer:
         optics.fit(X=self.data)
         return self._extract_best_optics(optics)
 
+    def _bl_random(self):
+        rand_k = random.randint(1, len(self.data) + 1)
+        # Assign doucments on random
+        return random.choices(population=list(range(rand_k)),
+                              k=len(self.data))
+
+    def _bl_singleton(self):
+        return list(range(len(self.data)))
+
     def _hdp_topic_clusters(self):
         """
         Convert the topic ascriptions to deterministic clusters using max
@@ -350,7 +362,7 @@ class Clusterer:
             return None
         # Convert the series to a dict of set of labels
         return pd.Series(index=labels.index,
-                         data=[set(str(v)) for v in labels.values]).to_dict()
+                         data=[set([str(v)]) for v in labels.values]).to_dict()
 
     def _eval_clustering(self, labels_true, labels_predicted):
         nmi = normalized_mutual_info_score(labels_true,
@@ -444,6 +456,12 @@ class Clusterer:
 
         elif alg_option == Clusterer.alg_x_means:
             clustering_labels = self._cluster_xmeans()
+
+        elif alg_option == Clusterer.bl_random:
+            clustering_labels = self._bl_random()
+
+        elif alg_option == Clusterer.bl_singleton:
+            clustering_labels = self._bl_singleton()
 
         else:
             return None
