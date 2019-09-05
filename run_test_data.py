@@ -90,8 +90,8 @@ class TestApproach:
         norm_ms_pred, norm_ms_evals = clu_lss.evaluate(
                 alg_option=Clusterer.alg_mean_shift)
 
-        norm_xm_pred, norm_xm_evals = clu_lss.evaluate(
-                alg_option=Clusterer.alg_x_means)
+#        norm_xm_pred, norm_xm_evals = clu_lss.evaluate(
+#                alg_option=Clusterer.alg_x_means)
 
         nhac_complete_pred, nhac_complete_evals = clu_lss.evaluate(
                 alg_option=Clusterer.alg_hac,
@@ -108,6 +108,12 @@ class TestApproach:
         n_optics_pred, n_optics_evals = clu_lss.evaluate(
                 alg_option=Clusterer.alg_optics)
 
+        # Baselines
+        bl_rand_pred, bl_rand_evals = clu_lss.evaluate(
+                alg_option=Clusterer.bl_random)
+        bl_singleton_pred, bl_singleton_evals = clu_lss.evaluate(
+                alg_option=Clusterer.bl_singleton)
+
         nhdp_pred, nhdp_evals = clu_lss.eval_cluster_hdp()
         ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
 
@@ -115,19 +121,22 @@ class TestApproach:
             k_trend = clu_lss.cand_k
             k_trend.append(1 + max(clu_lss.true_labels))
         else:
-            k_trend = [1 + max(clu_lss.true_labels)] * 11
+            k_trend = [1 + max(clu_lss.true_labels)] * 10
 
         result = Tools.form_problemset_result_dictionary(
                 dictionaries=[
+                        # ispk_evals, norm_spk_evals, norm_hdbscan_evals,
                         norm_spk_evals, norm_hdbscan_evals,
-                        norm_ms_evals, norm_xm_evals,
+                        norm_ms_evals,  # norm_xm_evals,
                         nhac_complete_evals, nhac_s_evals, nhac_a_evals,
-                        n_optics_evals,
+                        n_optics_evals, bl_rand_evals, bl_singleton_evals,
                         nhdp_evals, ntrue_evals
                         ],
-                identifiers=["Spherical_KMeans", "HDBSCAN",
-                             "Mean_Shift", "XMeans", "HAC_Complete",
-                             "HAC_Single", "HAC_Average", "OPTICS",
+                identifiers=[  # "iSpKmeans",
+                             "SPKMeans", "HDBSCAN",
+                             "Mean_Shift",  # "XMeans",
+                             "HAC_C", "HAC_Single", "HAC_Average",
+                             "OPTICS", "BL_r", "BL_s",
                              "HDP", "Labels"],
                 problem_set=ps)
 
@@ -205,28 +214,26 @@ if __name__ == "__main__":
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
-# =============================================================================
-#     print("========== NEUTRAL ==========")
-#     tester.run_test(configuration=TestApproach.config_neutral,
-#                     drop_uncommon=True,
-#                     save_name_suff="_final",
-#                     infer=False,
-#                     desired_k=None)
-#     print("========== DENSE ==========")
-#     tester.run_test(configuration=TestApproach.config_dense,
-#                     drop_uncommon=True,
-#                     save_name_suff="_final",
-#                     infer=False,
-#                     desired_k=None)
-#     print("========== SPARSE ==========")
-#     tester.run_test(configuration=TestApproach.config_sparse,
-#                     drop_uncommon=True,
-#                     save_name_suff="_final",
-#                     infer=False,
-#                     desired_k=None)
-#
-#     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬Using True K ▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
-# =============================================================================
+    print("========== NEUTRAL ==========")
+    tester.run_test(configuration=TestApproach.config_neutral,
+                    drop_uncommon=True,
+                    save_name_suff="_final",
+                    infer=False,
+                    desired_k=None)
+    print("========== DENSE ==========")
+    tester.run_test(configuration=TestApproach.config_dense,
+                    drop_uncommon=True,
+                    save_name_suff="_final",
+                    infer=False,
+                    desired_k=None)
+    print("========== SPARSE ==========")
+    tester.run_test(configuration=TestApproach.config_sparse,
+                    drop_uncommon=True,
+                    save_name_suff="_final",
+                    infer=False,
+                    desired_k=None)
+
+    print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬Using True K ▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
     print("========== NEUTRAL-K ==========")
     tester.run_test(configuration=TestApproach.config_neutral,

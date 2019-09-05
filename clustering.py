@@ -47,7 +47,8 @@ class Clusterer:
                  max_nbr_clusters: int,
                  min_nbr_clusters: int,
                  metric: str,
-                 desired_n_clusters: int = None):
+                 desired_n_clusters: int = None,
+                 include_bic: bool = False):
         """
         The default constructor, encapsulating common attributes
 
@@ -77,13 +78,13 @@ class Clusterer:
                 self.estimated_k = False
             else:
                 # Estimate k using on L2 normalised data
-                self.k, self.cand_k = self._estimate_k()
+                self.k, self.cand_k = self._estimate_k(include_bic=include_bic)
                 self.estimated_k = True
         else:
             print("\nERROR: cannot create class.\n"
                   "Data must be passed as a dataframe or similar structure.\n")
 
-    def _estimate_k(self):
+    def _estimate_k(self, include_bic: bool):
         """
         Estimate the best k -number of clusters- using various methods.
 
@@ -95,7 +96,6 @@ class Clusterer:
             Note: the data would be L2-normalised before proceeding
 
         """
-        k_bic = len(unique(self._cluster_xmeans()))
 
         # Define a custom clusterer for the Gap statistic
         def ms(X, k):
@@ -108,10 +108,16 @@ class Clusterer:
         gmeans = GMeans(random_state=137, max_depth=500)
         gmeans.fit(self.data)
         k_gaussian = len(unique(gmeans.labels_))
-        est_k = round((k_bic + k_gap + k_gaussian) / 3)
 
-        return (est_k,
-                [est_k, k_bic, k_gap, k_gaussian])
+        if include_bic:
+            k_bic = len(unique(self._cluster_xmeans()))
+            est_k = round((k_bic + k_gap + k_gaussian) / 3)
+            return (est_k,
+                    [est_k, k_bic, k_gap, k_gaussian])
+        else:
+            est_k = round((k_gap + k_gaussian) / 2)
+            return (est_k,
+                    [est_k, k_gap, k_gaussian])
 
     def _process_noise_as_singletons(self, result: List):
         place(result, result == -1,

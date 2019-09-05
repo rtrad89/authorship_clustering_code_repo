@@ -244,7 +244,7 @@ class Tools:
                           test_data: bool = False):
         df_k_vals = pd.DataFrame(k_vals,
                                  columns=["est_k",
-                                          "bic", "gap", "gmeans",
+                                          "gap", "gmeans",
                                           "hac_c", "est_avg_c",
                                           "hac_s", "est_avg_s",
                                           "hac_a", "est_avg_a",

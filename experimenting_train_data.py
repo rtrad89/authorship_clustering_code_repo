@@ -97,8 +97,8 @@ def problem_set_run(problem_set_id: int,
         norm_ms_pred, norm_ms_evals = clu_lss.evaluate(
                 alg_option=Clusterer.alg_mean_shift)
 
-        norm_xm_pred, norm_xm_evals = clu_lss.evaluate(
-                alg_option=Clusterer.alg_x_means)
+#        norm_xm_pred, norm_xm_evals = clu_lss.evaluate(
+#                alg_option=Clusterer.alg_x_means)
 
         nhac_complete_pred, nhac_complete_evals = clu_lss.evaluate(
                 alg_option=Clusterer.alg_hac,
@@ -129,16 +129,16 @@ def problem_set_run(problem_set_id: int,
                 dictionaries=[
                         # ispk_evals, norm_spk_evals, norm_hdbscan_evals,
                         norm_spk_evals, norm_hdbscan_evals,
-                        norm_ms_evals, norm_xm_evals,
+                        norm_ms_evals,  # norm_xm_evals,
                         nhac_complete_evals, nhac_s_evals, nhac_a_evals,
                         n_optics_evals, bl_rand_evals, bl_singleton_evals,
                         nhdp_evals, ntrue_evals
                         ],
                 identifiers=[  # "iSpKmeans",
-                             "Spherical_KMeans", "HDBSCAN",
-                             "Mean_Shift", "XMeans", "HAC_Complete",
-                             "HAC_Single", "HAC_Average", "OPTICS",
-                             "BL_random", "BL_singleton",
+                             "SPKMeans", "HDBSCAN",
+                             "Mean_Shift",  # "XMeans",
+                             "HAC_C", "HAC_Single", "HAC_Average",
+                             "OPTICS", "BL_r", "BL_s",
                              "HDP", "Labels"],
                 problem_set=problem_set_id),
                 ground_truth,
@@ -247,94 +247,92 @@ if __name__ == "__main__":
 
     print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ KEEP UNCOMMONS ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
-# =============================================================================
-#     print("==================== NEUTRAL ====================")
-#     problemsets_results = []
-#     k_vals = []
-#     for ps in scope:
-#         print(f"Executing on problem set ► {ps:03d} ◄ ..")
-#         ps_result, l, lss, plain, clu = problem_set_run(
-#             problem_set_id=ps,
-#             n_clusters=None,
-#             # Emperically specify a random seed that's compatible with
-#             # hyper sampling and certain problem sets due to a bug in HDP
-#             # as it seems. However, the seeds would be consistant across
-#             # runs and yield comparable results for our experiments
-#             # (comparing different runs of HDP on a problem set)
-#             seed=max(33, 70*(ps == 41)) + (3 * (ps in problematics)),
-#             infer_lss=False,
-#             verbose=False,
-#             configuration=config_neutral,
-#             drop_uncommon=False)
-#         problemsets_results.append(ps_result)
-#         ks = clu.cand_k.copy()
-#         ks.append(1+max(clu.true_labels))
-#         k_vals.append(ks)
-#     my_suffix = "_training_neutral_uncommon"
-#     info_json = r"..\..\Datasets\pan17_train\info.json"
-#     Tools.splice_save_problemsets_dictionaries(problemsets_results,
-#                                                metadata_fpath=info_json,
-#                                                suffix=my_suffix)
-#     Tools.save_k_vals_as_df(k_vals=k_vals, suffix=my_suffix)
-#
-#     print("==================== SPARSE ====================")
-#     problemsets_results = []
-#     k_vals = []
-#     for ps in scope:
-#         print(f"Executing on problem set ► {ps:03d} ◄ ..")
-#         ps_result, l, lss, plain, clu = problem_set_run(
-#             problem_set_id=ps,
-#             n_clusters=None,
-#             # Emperically specify a random seed that's compatible with
-#             # hyper sampling and certain problem sets due to a bug in HDP
-#             # as it seems. However, the seeds would be consistant across
-#             # runs and yield comparable results for our experiments
-#             # (comparing different runs of HDP on a problem set)
-#             seed=13712 * ps,
-#             infer_lss=False,
-#             verbose=False,
-#             configuration=config_sparse,
-#             drop_uncommon=False)
-#         problemsets_results.append(ps_result)
-#         ks = clu.cand_k.copy()
-#         ks.append(1+max(clu.true_labels))
-#         k_vals.append(ks)
-#     my_suffix = "_training_sparse_uncommon"
-#     info_json = r"..\..\Datasets\pan17_train\info.json"
-#     Tools.splice_save_problemsets_dictionaries(problemsets_results,
-#                                                metadata_fpath=info_json,
-#                                                suffix=my_suffix)
-#     Tools.save_k_vals_as_df(k_vals=k_vals, suffix=my_suffix)
-#
-#     print("==================== DENSE ====================")
-#     problemsets_results = []
-#     k_vals = []
-#     for ps in scope:
-#         print(f"Executing on problem set ► {ps:03d} ◄ ..")
-#         ps_result, l, lss, plain, clu = problem_set_run(
-#             problem_set_id=ps,
-#             n_clusters=None,
-#             # Emperically specify a random seed that's compatible with
-#             # hyper sampling and certain problem sets due to a bug in HDP
-#             # as it seems. However, the seeds would be consistant across
-#             # runs and yield comparable results for our experiments
-#             # (comparing different runs of HDP on a problem set)
-#             seed=None,
-#             infer_lss=False,
-#             verbose=False,
-#             configuration=config_dense,
-#             drop_uncommon=False)
-#         problemsets_results.append(ps_result)
-#         ks = clu.cand_k.copy()
-#         ks.append(1+max(clu.true_labels))
-#         k_vals.append(ks)
-#     my_suffix = "_training_dense_uncommon"
-#     info_json = r"..\..\Datasets\pan17_train\info.json"
-#     Tools.splice_save_problemsets_dictionaries(problemsets_results,
-#                                                metadata_fpath=info_json,
-#                                                suffix=my_suffix)
-#     Tools.save_k_vals_as_df(k_vals=k_vals, suffix=my_suffix)
-#     print("Execution finished.")
-# =============================================================================
+    print("==================== NEUTRAL ====================")
+    problemsets_results = []
+    k_vals = []
+    for ps in scope:
+        print(f"Executing on problem set ► {ps:03d} ◄ ..")
+        ps_result, l, lss, plain, clu = problem_set_run(
+            problem_set_id=ps,
+            n_clusters=None,
+            # Emperically specify a random seed that's compatible with
+            # hyper sampling and certain problem sets due to a bug in HDP
+            # as it seems. However, the seeds would be consistant across
+            # runs and yield comparable results for our experiments
+            # (comparing different runs of HDP on a problem set)
+            seed=max(33, 70*(ps == 41)) + (3 * (ps in problematics)),
+            infer_lss=False,
+            verbose=False,
+            configuration=config_neutral,
+            drop_uncommon=False)
+        problemsets_results.append(ps_result)
+        ks = clu.cand_k.copy()
+        ks.append(1+max(clu.true_labels))
+        k_vals.append(ks)
+    my_suffix = "_training_neutral_uncommon"
+    info_json = r"..\..\Datasets\pan17_train\info.json"
+    Tools.splice_save_problemsets_dictionaries(problemsets_results,
+                                               metadata_fpath=info_json,
+                                               suffix=my_suffix)
+    Tools.save_k_vals_as_df(k_vals=k_vals, suffix=my_suffix)
+
+    print("==================== SPARSE ====================")
+    problemsets_results = []
+    k_vals = []
+    for ps in scope:
+        print(f"Executing on problem set ► {ps:03d} ◄ ..")
+        ps_result, l, lss, plain, clu = problem_set_run(
+            problem_set_id=ps,
+            n_clusters=None,
+            # Emperically specify a random seed that's compatible with
+            # hyper sampling and certain problem sets due to a bug in HDP
+            # as it seems. However, the seeds would be consistant across
+            # runs and yield comparable results for our experiments
+            # (comparing different runs of HDP on a problem set)
+            seed=13712 * ps,
+            infer_lss=False,
+            verbose=False,
+            configuration=config_sparse,
+            drop_uncommon=False)
+        problemsets_results.append(ps_result)
+        ks = clu.cand_k.copy()
+        ks.append(1+max(clu.true_labels))
+        k_vals.append(ks)
+    my_suffix = "_training_sparse_uncommon"
+    info_json = r"..\..\Datasets\pan17_train\info.json"
+    Tools.splice_save_problemsets_dictionaries(problemsets_results,
+                                               metadata_fpath=info_json,
+                                               suffix=my_suffix)
+    Tools.save_k_vals_as_df(k_vals=k_vals, suffix=my_suffix)
+
+    print("==================== DENSE ====================")
+    problemsets_results = []
+    k_vals = []
+    for ps in scope:
+        print(f"Executing on problem set ► {ps:03d} ◄ ..")
+        ps_result, l, lss, plain, clu = problem_set_run(
+            problem_set_id=ps,
+            n_clusters=None,
+            # Emperically specify a random seed that's compatible with
+            # hyper sampling and certain problem sets due to a bug in HDP
+            # as it seems. However, the seeds would be consistant across
+            # runs and yield comparable results for our experiments
+            # (comparing different runs of HDP on a problem set)
+            seed=None,
+            infer_lss=False,
+            verbose=False,
+            configuration=config_dense,
+            drop_uncommon=False)
+        problemsets_results.append(ps_result)
+        ks = clu.cand_k.copy()
+        ks.append(1+max(clu.true_labels))
+        k_vals.append(ks)
+    my_suffix = "_training_dense_uncommon"
+    info_json = r"..\..\Datasets\pan17_train\info.json"
+    Tools.splice_save_problemsets_dictionaries(problemsets_results,
+                                               metadata_fpath=info_json,
+                                               suffix=my_suffix)
+    Tools.save_k_vals_as_df(k_vals=k_vals, suffix=my_suffix)
+    print("Execution finished.")
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ ALL DONE ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
