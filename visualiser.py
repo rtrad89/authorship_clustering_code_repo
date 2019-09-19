@@ -41,6 +41,23 @@ class Visualiser():
         self.rectangle = rectangle_size
         self.figs = {}
 
+    def show_values_on_bars(self, axs):
+        def _show_on_single_plot(ax):
+            for p in ax.patches:
+                _x = p.get_x() + p.get_width() / 2
+                _y = .5 * (p.get_y() + p.get_height())
+                value = f"{p.get_height():0.3f}"
+                ax.text(_x, _y, value, ha="center",
+                        fontdict={"color": "black",
+                                  "weight": "bold",
+                                  "size": 10})
+
+        if isinstance(axs, pd.np.ndarray):
+            for idx, ax in pd.np.ndenumerate(axs):
+                _show_on_single_plot(ax)
+        else:
+            _show_on_single_plot(axs)
+
     def plot_gibbs_trace(self,
                          state_path: str,
                          key_suff: str):
@@ -89,6 +106,7 @@ class Visualiser():
 
     def analyse_results(self,
                         concise: bool,
+                        test_style: bool,
                         sparse_path: str,
                         neutral_path: str,
                         dense_path: str,
@@ -113,12 +131,15 @@ class Visualiser():
                     ~df_dense_res.algorithm.isin(
                             ["HDBSCAN", "HAC_Single", "HAC_Average"])]
 
-        df_all = pd.concat(
-                [df_neutral_res, df_sparse_res, df_dense_res],
-                axis=0,
-                keys=["Neutral", "Sparse", "Dense"]
-                ).reset_index(level=0).rename(
-                        columns={"level_0": "topics_prior"})
+        if test_style:
+            df_all = df_sparse_res
+        else:
+            df_all = pd.concat(
+                    [df_neutral_res, df_sparse_res, df_dense_res],
+                    axis=0,
+                    keys=["Neutral", "Sparse", "Dense"]
+                    ).reset_index(level=0).rename(
+                            columns={"level_0": "topics_prior"})
 
         algo_alpha_order = sorted(set(df_all.algorithm.values))
 
@@ -126,28 +147,50 @@ class Visualiser():
                                                ncols=2,
                                                clear=True,
                                                figsize=self.rectangle)
-        sns.barplot(x="algorithm", y="bcubed_fscore", hue="topics_prior",
-                    data=df_all,
-                    errwidth=self.error_width,
-                    capsize=self.error_cap_size,
-                    order=algo_alpha_order,
-                    ax=ax_overall[0])
-        ax_overall[0].axhline(0.573, ls='--')
+        if test_style:
+            sns.barplot(x="algorithm", y="bcubed_fscore",
+                        data=df_all,
+                        errwidth=self.error_width,
+                        capsize=self.error_cap_size,
+                        order=algo_alpha_order,
+                        ax=ax_overall[0])
 
-        sns.barplot(x="algorithm", y="ari", hue="topics_prior",
-                    data=df_all,
-                    errwidth=self.error_width,
-                    capsize=self.error_cap_size,
-                    order=algo_alpha_order,
-                    ax=ax_overall[1])
+            sns.barplot(x="algorithm", y="ari",
+                        data=df_all,
+                        errwidth=self.error_width,
+                        capsize=self.error_cap_size,
+                        order=algo_alpha_order,
+                        ax=ax_overall[1])
+        else:
+            sns.barplot(x="algorithm", y="bcubed_fscore", hue="topics_prior",
+                        data=df_all,
+                        errwidth=self.error_width,
+                        capsize=self.error_cap_size,
+                        order=algo_alpha_order,
+                        ax=ax_overall[0])
+
+            sns.barplot(x="algorithm", y="ari", hue="topics_prior",
+                        data=df_all,
+                        errwidth=self.error_width,
+                        capsize=self.error_cap_size,
+                        order=algo_alpha_order,
+                        ax=ax_overall[1])
+
+        if not test_style:
+            ax_overall[0].legend(loc="lower right")
+            ax_overall[1].legend(loc="upper left")
+        else:
+            # Set the state-of-the-art bar:
+            ax_overall[0].axhline(0.573, ls='--')
 
         # Rotate the x labels:
         for ax in fig_overall.axes:
             plt.sca(ax)
             ax.set_xlabel("")
-            ax.legend(loc=4)  # 4 for lower right
             plt.xticks(rotation=90)
-        plt.legend(loc="lower right")
+        # Show values on final test charts:
+        if test_style:
+            self.show_values_on_bars(ax_overall)
         plt.tight_layout()
         plt.show()
         plt.close()
@@ -264,7 +307,7 @@ class Visualiser():
         if concise:
             k_vals = pd.read_csv(k_vals_path, low_memory=False,
                                  usecols=["est_k", "gap",
-                                          "gmeans", "hac_c", "est_avg_c",
+                                          "gmeans", "hac_c", "optics",
                                           "true"])
         else:
             k_vals = pd.read_csv(k_vals_path, low_memory=False, index_col=0)
@@ -288,7 +331,7 @@ class Visualiser():
                         marker="P",
                         ax=ax[1],
                         data=k_vals)
-        sns.scatterplot(x="true", y="est_avg_c", color=".0",
+        sns.scatterplot(x="true", y="optics", color=".0",
                         marker="^",
                         ax=ax[2],
                         data=k_vals)
@@ -324,6 +367,7 @@ class Visualiser():
         for ax in fig_rmse.axes:
             plt.sca(ax)
             plt.xticks(rotation=90)
+        self.show_values_on_bars(ax_rmse)
         plt.tight_layout()
         plt.show()
         plt.close()
@@ -337,7 +381,7 @@ class Visualiser():
                        name: str = "Charts",
                        dpi: int = 600,
                        charts_format: str = "pdf",
-                       flush: bool = True):
+                       flush: bool = False):
         if vis.figs is None:
             print("No cached figures were found.")
             return
@@ -365,23 +409,23 @@ if __name__ == "__main__":
     # First the training data
     sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
               r"\authorship_clustering_code_repo\__outputs__"
-              r"\results_20190904_172707_training_sparse_common.csv")
+              r"\results_20190909_225946_training_sparse_common.csv")
     dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
              r"\authorship_clustering_code_repo\__outputs__"
-             r"\results_20190904_173103_training_dense_common.csv")
+             r"\results_20190909_230441_training_dense_common.csv")
     neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__"
-               r"\results_20190904_171627_training_neutral_common.csv")
+               r"\results_20190909_224726_training_neutral_common.csv")
 
     k_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                 r"\authorship_clustering_code_repo\__outputs__"
-                r"\k_trend_20190904_172707_training_sparse_common.csv")
+                r"\k_trend_20190909_225946_training_sparse_common.csv")
     k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__"
-               r"\k_trend_20190904_173103_training_dense_common.csv")
+               r"\k_trend_20190909_230441_training_dense_common.csv")
     k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                  r"\authorship_clustering_code_repo\__outputs__"
-                 r"\k_trend_20190904_171627_training_neutral_common.csv")
+                 r"\k_trend_20190909_224726_training_neutral_common.csv")
 
     trace_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
                     r"\pan17_train\problem015"
@@ -400,6 +444,7 @@ if __name__ == "__main__":
     vis = Visualiser(scale=1.25)
 
     vis.analyse_results(concise=True,
+                        test_style=False,
                         sparse_path=sparse,
                         dense_path=dense,
                         neutral_path=neutral,
@@ -426,23 +471,23 @@ if __name__ == "__main__":
     # Now the test data
     sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
               r"\authorship_clustering_code_repo\__outputs__\TESTS"
-              r"\results_20190904_183557_final_sparse.csv")
+              r"\results_20190910_000716_final_sparse.csv")
     dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
              r"\authorship_clustering_code_repo\__outputs__\TESTS"
-             r"\results_20190904_180818_final_dense.csv")
+             r"\results_20190909_234346_final_dense.csv")
     neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__\TESTS"
-               r"\results_20190904_175831_final_neutral.csv")
+               r"\results_20190909_233408_final_neutral.csv")
 
     k_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                 r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                r"\k_trend_20190904_183558_final_sparse.csv")
+                r"\k_trend_20190910_000716_final_sparse.csv")
     k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__\TESTS"
-               r"\k_trend_20190904_180818_final_dense.csv")
+               r"\k_trend_20190909_234346_final_dense.csv")
     k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                  r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                 r"\k_trend_20190904_175831_final_neutral.csv")
+                 r"\k_trend_20190909_233408_final_neutral.csv")
 
     trace_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
                     r"\pan17_test\problem015\lss_0.30_0.10_0.10_common_True"
@@ -456,15 +501,16 @@ if __name__ == "__main__":
 
     sparse_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                      r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                     r"\results_20190904_190514_final_trueK_sparse.csv")
+                     r"\results_20190910_014423_final_trueK_sparse.csv")
     dense_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                     r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                    r"\results_20190904_185832_final_trueK_dense.csv")
+                    r"\results_20190910_014057_final_trueK_dense.csv")
     neutral_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                       r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                      r"\results_20190904_185206_final_trueK_neutral.csv")
+                      r"\results_20190910_013727_final_trueK_neutral.csv")
 
     vis.analyse_results(concise=True,
+                        test_style=True,
                         sparse_path=sparse,
                         dense_path=dense,
                         neutral_path=neutral,
@@ -489,6 +535,7 @@ if __name__ == "__main__":
                          key_suff="_neutral")
 
     vis.analyse_results(concise=True,
+                        test_style=True,
                         sparse_path=sparse_true_k,
                         dense_path=dense_true_k,
                         neutral_path=neutral_true_k,

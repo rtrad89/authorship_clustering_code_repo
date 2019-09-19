@@ -13,7 +13,7 @@ from typing import List, Dict
 import powerlaw
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import normalize
-
+from scipy.stats import friedmanchisquare
 
 class Tools:
     """A helper class providing methods for managing files and folders
@@ -244,10 +244,12 @@ class Tools:
                           test_data: bool = False):
         df_k_vals = pd.DataFrame(k_vals,
                                  columns=["est_k",
-                                          "gap", "gmeans",
-                                          "hac_c", "est_avg_c",
-                                          "hac_s", "est_avg_s",
-                                          "hac_a", "est_avg_a",
+                                          "gap",
+                                          "gmeans",
+                                          "hac_c",
+                                          "hac_s",
+                                          "hac_a",
+                                          "optics",
                                           "true"])
 
         timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
@@ -257,6 +259,43 @@ class Tools:
             path = f"./__outputs__/k_trend_{timestamp}{suffix}.csv"
 
         df_k_vals.to_csv(path)
+
+    @staticmethod
+    def test_friedman(data_path: str):
+        # Load the data from disk
+        df = pd.read_csv(data_path, low_memory=False)
+        # Reshape the results so that the treatments (algorithms) are in
+        # arranged in a columnar fashion
+        pvt_b3f = df.pivot_table(
+                values="bcubed_fscore", columns="algorithm", index="set")
+        pvt_ari = df.pivot_table(
+                values="ari", columns="algorithm", index="set")
+
+        pvt_b3f.drop(
+                columns=["HAC_Average", "HAC_Single", "HDBSCAN", "Labels"],
+                inplace=True)
+        pvt_ari.drop(
+                columns=["HAC_Average", "HAC_Single", "HDBSCAN", "Labels"],
+                inplace=True)
+
+        alpha = 0.05
+        pvt_b3f = pvt_b3f.T.values
+        stat_b3f, p_b3f = friedmanchisquare(
+                pvt_b3f[0], pvt_b3f[1],
+                pvt_b3f[2], pvt_b3f[3],
+                pvt_b3f[4], pvt_b3f[5],
+                pvt_b3f[6])
+
+        pvt_ari = pvt_ari.T.values
+        stat_ari, p_ari = friedmanchisquare(
+                pvt_ari[0], pvt_ari[1],
+                pvt_ari[2], pvt_ari[3],
+                pvt_ari[4], pvt_ari[5],
+                pvt_ari[6])
+
+        sig_b3f = p_b3f <= alpha
+        sig_ari = p_ari <= alpha
+        return sig_b3f, sig_ari
 
     @staticmethod
     def calc_rmse(x: pd.Series,

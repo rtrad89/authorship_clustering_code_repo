@@ -291,13 +291,13 @@ class Clusterer:
                                                    verbose=False)
             self.cand_k.append(hac_k)
             # Use an average of all the methods for the estimation
-            k = round((hac_k + sum(self.cand_k)) / (1+len(self.cand_k)))
+            # k = round((hac_k + sum(self.cand_k)) / (1+len(self.cand_k)))
             # Append the calculated average
-            self.cand_k.append(k)
+            # self.cand_k.append(k)
         else:
-            k = self.k
+            hac_k = self.k
 
-        hac = AgglomerativeClustering(n_clusters=k,
+        hac = AgglomerativeClustering(n_clusters=hac_k,
                                       affinity=self.distance_metric,
                                       linkage=linkage)
         pred = hac.fit_predict(self.data)
@@ -337,7 +337,11 @@ class Clusterer:
                         metric=self.distance_metric,
                         leaf_size=len(self.data))
         optics.fit(X=self.data)
-        return self._extract_best_optics(optics)
+        pred = self._extract_best_optics(optics)
+        # Append its k to the list of values
+        if self.estimated_k:
+            self.cand_k.append(1+max(pred))
+        return pred
 
     def _bl_random(self):
         rand_k = random.randint(1, len(self.data) + 1)
