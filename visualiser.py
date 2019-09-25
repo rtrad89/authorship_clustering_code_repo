@@ -376,6 +376,38 @@ class Visualiser():
                           f"k_rmse{key_suff}": fig_rmse})
         return k_vals, df_rmse
 
+    def visualise_cluster_sizes_hist(self,
+                                     train_path: str,
+                                     test_path: str,
+                                     train_only: bool = False):
+        freq = []
+        with Tools.scan_directory(f"{train_path}\\truth") as pss:
+            for ps in pss:
+                filepath = f"{ps.path}\\clustering.json"
+                labels = Tools.load_true_clusters_into_vector(filepath)
+                freq.extend(labels.value_counts())
+        if not train_only:
+            with Tools.scan_directory(f"{test_path}\\truth") as pss:
+                for ps in pss:
+                    filepath = f"{ps.path}\\clustering.json"
+                    labels = Tools.load_true_clusters_into_vector(filepath)
+                    freq.extend(labels.value_counts())
+
+        hist_data = pd.Series(freq, name="Clusters Sizes").value_counts()
+
+        fig, ax = plt.subplots(clear=True, figsize=self.single)
+
+        sns.barplot(x=hist_data.index, y=hist_data.values, ax=ax,
+                    palette="GnBu_d")
+        ax.set(xlabel="Cluster Size", ylabel="Frequency")
+        ax.set_title(f"# Clusters = {hist_data.sum()}")
+        plt.tight_layout()
+        plt.show()
+        plt.close()
+
+        self.figs.update({"Cluster_size_histogram": fig})
+        return fig, hist_data
+
     def serialise_figs(self,
                        out_dir: str = r".\__outputs__\charts",
                        name: str = "Charts",
@@ -409,23 +441,23 @@ if __name__ == "__main__":
     # First the training data
     sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
               r"\authorship_clustering_code_repo\__outputs__"
-              r"\results_20190909_225946_training_sparse_common.csv")
+              r"\results_20190924_213257_training_sparse_common.csv")
     dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
              r"\authorship_clustering_code_repo\__outputs__"
-             r"\results_20190909_230441_training_dense_common.csv")
+             r"\results_20190924_213715_training_dense_common.csv")
     neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__"
-               r"\results_20190909_224726_training_neutral_common.csv")
+               r"\results_20190924_211938_training_neutral_common.csv")
 
     k_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                 r"\authorship_clustering_code_repo\__outputs__"
-                r"\k_trend_20190909_225946_training_sparse_common.csv")
+                r"\k_trend_20190924_213257_training_sparse_common.csv")
     k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__"
-               r"\k_trend_20190909_230441_training_dense_common.csv")
+               r"\k_trend_20190924_213715_training_dense_common.csv")
     k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                  r"\authorship_clustering_code_repo\__outputs__"
-                 r"\k_trend_20190909_224726_training_neutral_common.csv")
+                 r"\k_trend_20190924_211938_training_neutral_common.csv")
 
     trace_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
                     r"\pan17_train\problem015"
@@ -441,7 +473,7 @@ if __name__ == "__main__":
                      r"\state.log")
 
     # Analyse charts and construct the cached pool:
-    vis = Visualiser(scale=1.25)
+    vis = Visualiser(scale=1.2)
 
     vis.analyse_results(concise=True,
                         test_style=False,
@@ -471,23 +503,23 @@ if __name__ == "__main__":
     # Now the test data
     sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
               r"\authorship_clustering_code_repo\__outputs__\TESTS"
-              r"\results_20190910_000716_final_sparse.csv")
+              r"\results_20190923_234123_final_sparse.csv")
     dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
              r"\authorship_clustering_code_repo\__outputs__\TESTS"
-             r"\results_20190909_234346_final_dense.csv")
+             r"\results_20190923_231000_final_dense.csv")
     neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__\TESTS"
-               r"\results_20190909_233408_final_neutral.csv")
+               r"\results_20190923_225951_final_neutral.csv")
 
     k_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                 r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                r"\k_trend_20190910_000716_final_sparse.csv")
+                r"\k_trend_20190923_234123_final_sparse.csv")
     k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__\TESTS"
-               r"\k_trend_20190909_234346_final_dense.csv")
+               r"\k_trend_20190923_231000_final_dense.csv")
     k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                  r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                 r"\k_trend_20190909_233408_final_neutral.csv")
+                 r"\k_trend_20190923_225952_final_neutral.csv")
 
     trace_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
                     r"\pan17_test\problem015\lss_0.30_0.10_0.10_common_True"
@@ -501,13 +533,21 @@ if __name__ == "__main__":
 
     sparse_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                      r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                     r"\results_20190910_014423_final_trueK_sparse.csv")
+                     r"\results_20190923_235606_final_trueK_sparse.csv")
     dense_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                     r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                    r"\results_20190910_014057_final_trueK_dense.csv")
+                    r"\results_20190923_235117_final_trueK_dense.csv")
     neutral_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                       r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                      r"\results_20190910_013727_final_trueK_neutral.csv")
+                      r"\results_20190923_234615_final_trueK_neutral.csv")
+
+    vis.visualise_cluster_sizes_hist(
+            train_only=False,
+            train_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                        r"\Datasets\pan17_train"),
+            test_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                       r"\Datasets\pan17_test")
+            )
 
     vis.analyse_results(concise=True,
                         test_style=True,
@@ -541,4 +581,8 @@ if __name__ == "__main__":
                         neutral_path=neutral_true_k,
                         key_suff="_true_k")
     # Serialise the cached pool to disk
-#    vis.serialise_figs(charts_format="eps")
+    vis.serialise_figs(charts_format="eps")
+    # Run Friedman-Nemenyi test with Bonferroni correction for multiple tests
+    # since the dataset is the same
+    print(Tools.friedman_nemenyi_bonferroni_tests(
+            data_path=sparse, save_outputs=False))

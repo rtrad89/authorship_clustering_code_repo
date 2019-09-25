@@ -124,6 +124,14 @@ def problem_set_run(problem_set_id: int,
         nhdp_pred, nhdp_evals = clu_lss.eval_cluster_hdp()
         ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
 
+        # SOTA - Gomez et. al. HAC and Log-Entropy with 20k features
+        sota_pred_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+                          r"\clusterPAN2017-master\train_out_LogEnt"
+                          f"\\problem{problem_nbr}\\clustering.json")
+        sota_predicted = Tools.load_true_clusters_into_vector(sota_pred_path)
+        sota_pred, sota_evals = clu_lss.eval_sota(
+                sota_predicted=sota_predicted)
+
         # Return the results:
         return (Tools.form_problemset_result_dictionary(
                 dictionaries=[
@@ -132,14 +140,14 @@ def problem_set_run(problem_set_id: int,
                         norm_ms_evals,  # norm_xm_evals,
                         nhac_complete_evals, nhac_s_evals, nhac_a_evals,
                         n_optics_evals, bl_rand_evals, bl_singleton_evals,
-                        nhdp_evals, ntrue_evals
+                        nhdp_evals, sota_evals, ntrue_evals
                         ],
                 identifiers=[  # "iSpKmeans",
                              "SPKMeans", "HDBSCAN",
                              "Mean_Shift",  # "XMeans",
                              "HAC_C", "HAC_Single", "HAC_Average",
                              "OPTICS", "BL_r", "BL_s",
-                             "HDP", "Labels"],
+                             "HDP", "SOTA", "Labels"],
                 problem_set=problem_set_id),
                 ground_truth,
                 lss_rep_docs,

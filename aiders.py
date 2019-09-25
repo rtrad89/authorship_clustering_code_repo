@@ -14,6 +14,8 @@ import powerlaw
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import normalize
 from scipy.stats import friedmanchisquare
+from scikit_posthocs import posthoc_nemenyi_friedman
+
 
 class Tools:
     """A helper class providing methods for managing files and folders
@@ -261,7 +263,8 @@ class Tools:
         df_k_vals.to_csv(path)
 
     @staticmethod
-    def test_friedman(data_path: str):
+    def friedman_nemenyi_bonferroni_tests(
+            data_path: str, save_outputs: bool = False):
         # Load the data from disk
         df = pd.read_csv(data_path, low_memory=False)
         # Reshape the results so that the treatments (algorithms) are in
@@ -278,24 +281,31 @@ class Tools:
                 columns=["HAC_Average", "HAC_Single", "HDBSCAN", "Labels"],
                 inplace=True)
 
-        alpha = 0.05
-        pvt_b3f = pvt_b3f.T.values
-        stat_b3f, p_b3f = friedmanchisquare(
-                pvt_b3f[0], pvt_b3f[1],
-                pvt_b3f[2], pvt_b3f[3],
-                pvt_b3f[4], pvt_b3f[5],
-                pvt_b3f[6])
+        alpha = .05 / 2.0  # Bonferroni Correction with 2 tests
 
-        pvt_ari = pvt_ari.T.values
-        stat_ari, p_ari = friedmanchisquare(
-                pvt_ari[0], pvt_ari[1],
-                pvt_ari[2], pvt_ari[3],
-                pvt_ari[4], pvt_ari[5],
-                pvt_ari[6])
+        stat_b3f, p_b3f = friedmanchisquare(*pvt_b3f.T.values)
+        stat_ari, p_ari = friedmanchisquare(*pvt_ari.T.values)
 
         sig_b3f = p_b3f <= alpha
         sig_ari = p_ari <= alpha
-        return sig_b3f, sig_ari
+
+        posthoc_b3f, posthoc_ari = None, None
+        if sig_b3f:
+            # The omnibus test succeeded, drilling down to the posthoc test
+            posthoc_b3f = posthoc_nemenyi_friedman(pvt_b3f)
+            if save_outputs:
+                posthoc_b3f.to_csv(
+                        r"./__outputs__/TESTS"
+                        f"/Friedman_Nemenyi_B3F_a_{alpha:0.4f}.csv")
+        if sig_ari:
+            # The omnibus test succeeded, drilling down to the posthoc test
+            posthoc_ari = posthoc_nemenyi_friedman(pvt_ari)
+            if save_outputs:
+                posthoc_ari.to_csv(
+                        r"./__outputs__/TESTS/"
+                        f"Friedman_Nemenyi_ARI_a_{alpha:0.4f}.csv")
+
+        return alpha, sig_b3f, posthoc_b3f, sig_ari, posthoc_ari
 
     @staticmethod
     def calc_rmse(x: pd.Series,

@@ -505,6 +505,11 @@ class Clusterer:
                 self.true_labels,
                 self.true_labels)
 
+    def eval_sota(self, sota_predicted: pd.Series):
+        return sota_predicted.to_numpy(), self._eval_clustering(
+                labels_predicted=sota_predicted,
+                labels_true=self.true_labels)
+
 
 def main():
     exit(0)

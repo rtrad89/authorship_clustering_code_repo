@@ -117,6 +117,14 @@ class TestApproach:
         nhdp_pred, nhdp_evals = clu_lss.eval_cluster_hdp()
         ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
 
+        # SOTA - Gomez et. al. HAC and Log-Entropy with 20k features
+        sota_pred_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+                          r"\clusterPAN2017-master\output_LogEnt"
+                          f"\\problem{ps:03d}\\clustering.json")
+        sota_predicted = Tools.load_true_clusters_into_vector(sota_pred_path)
+        sota_pred, sota_evals = clu_lss.eval_sota(
+                sota_predicted=sota_predicted)
+
         if desired_k != 0:
             k_trend = clu_lss.cand_k
             k_trend.append(1 + max(clu_lss.true_labels))
@@ -130,14 +138,14 @@ class TestApproach:
                         norm_ms_evals,  # norm_xm_evals,
                         nhac_complete_evals, nhac_s_evals, nhac_a_evals,
                         n_optics_evals, bl_rand_evals, bl_singleton_evals,
-                        nhdp_evals, ntrue_evals
+                        nhdp_evals, sota_evals, ntrue_evals
                         ],
                 identifiers=[  # "iSpKmeans",
                              "SPKMeans", "HDBSCAN",
                              "Mean_Shift",  # "XMeans",
                              "HAC_C", "HAC_Single", "HAC_Average",
                              "OPTICS", "BL_r", "BL_s",
-                             "HDP", "Labels"],
+                             "HDP", "SOTA", "Labels"],
                 problem_set=ps)
 
         return result, k_trend
@@ -214,26 +222,24 @@ if __name__ == "__main__":
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
-# =============================================================================
-#     print("========== NEUTRAL ==========")
-#     tester.run_test(configuration=TestApproach.config_neutral,
-#                     drop_uncommon=True,
-#                     save_name_suff="_final",
-#                     infer=False,
-#                     desired_k=None)
-#     print("========== DENSE ==========")
-#     tester.run_test(configuration=TestApproach.config_dense,
-#                     drop_uncommon=True,
-#                     save_name_suff="_final",
-#                     infer=False,
-#                     desired_k=None)
-#     print("========== SPARSE ==========")
-#     tester.run_test(configuration=TestApproach.config_sparse,
-#                     drop_uncommon=True,
-#                     save_name_suff="_final",
-#                     infer=False,
-#                     desired_k=None)
-# =============================================================================
+    print("========== NEUTRAL ==========")
+    tester.run_test(configuration=TestApproach.config_neutral,
+                    drop_uncommon=True,
+                    save_name_suff="_final",
+                    infer=False,
+                    desired_k=None)
+    print("========== DENSE ==========")
+    tester.run_test(configuration=TestApproach.config_dense,
+                    drop_uncommon=True,
+                    save_name_suff="_final",
+                    infer=False,
+                    desired_k=None)
+    print("========== SPARSE ==========")
+    tester.run_test(configuration=TestApproach.config_sparse,
+                    drop_uncommon=True,
+                    save_name_suff="_final",
+                    infer=False,
+                    desired_k=None)
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬Using True K ▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
