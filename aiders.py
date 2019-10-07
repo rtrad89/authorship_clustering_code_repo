@@ -245,14 +245,14 @@ class Tools:
                           suffix="",
                           test_data: bool = False):
         df_k_vals = pd.DataFrame(k_vals,
-                                 columns=["est_k",
-                                          "gap",
-                                          "gmeans",
-                                          "hac_c",
-                                          "hac_s",
-                                          "hac_a",
-                                          "optics",
-                                          "true"])
+                                 columns=["Est_k",
+                                          "Gap",
+                                          "G-means",
+                                          "Hac_c",
+                                          "Hac_s",
+                                          "Hac_a",
+                                          "OPTICS",
+                                          "TRUE"])
 
         timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
         if test_data:
@@ -311,6 +311,42 @@ class Tools:
     def calc_rmse(x: pd.Series,
                   y: pd.Series):
         return ((x - y) ** 2).mean() ** .5
+
+    @staticmethod
+    def analyse_true_k(truth_path: str,
+                       ps_range: range):
+        k = []
+        for ps in ps_range:
+            fp = f"{truth_path}\\problem{ps:03d}\\clustering.json"
+            k.append(len(Tools._read_json_file(fp)))
+        return pd.Series(k).describe()
+
+    @staticmethod
+    def get_sota_est_k(output_path: str):
+        vals = []
+        for ps in range(1, 121):
+            fp = f"{output_path}\\problem{ps:03d}\\clustering.json"
+            vals.append(len(Tools._read_json_file(fp)))
+        return pd.Series(vals)
+
+    @staticmethod
+    def analyse_LSSR_times(m_tr_path: str,
+                           m_te_path: str):
+        times = []
+        # Consume training times
+        for ps in range(1, 61):
+            fp = (f"{m_tr_path}\\problem{ps:03d}"
+                  "\\hdp_lss_0.30_0.10_0.10_common_True\\state.log")
+            df = pd.read_csv(fp, delim_whitespace=True, usecols=["time"])
+            times.append(df.iloc[-1, 0])
+        # Consume testing times
+        for ps in range(1, 121):
+            fp = (f"{m_te_path}\\problem{ps:03d}"
+                  "\\lss_0.30_0.10_0.10_common_True\\state.log")
+            df = pd.read_csv(fp, delim_whitespace=True, usecols=["time"])
+            times.append(df.iloc[-1, 0])
+
+        return pd.Series(times).describe()
 
 
 def main():

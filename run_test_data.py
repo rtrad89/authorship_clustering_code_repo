@@ -141,11 +141,11 @@ class TestApproach:
                         nhdp_evals, sota_evals, ntrue_evals
                         ],
                 identifiers=[  # "iSpKmeans",
-                             "SPKMeans", "HDBSCAN",
-                             "Mean_Shift",  # "XMeans",
-                             "HAC_C", "HAC_Single", "HAC_Average",
-                             "OPTICS", "BL_r", "BL_s",
-                             "HDP", "SOTA", "Labels"],
+                             "E_SPKMeans", "E_HDBSCAN",
+                             "E_Mean_Shift",  # "XMeans",
+                             "E_HAC_C", "E_HAC_Single", "E_HAC_Average",
+                             "E_OPTICS", "BL_r", "BL_s",
+                             "S_HDP", "BL_SOTA", "Labels"],
                 problem_set=ps)
 
         return result, k_trend
