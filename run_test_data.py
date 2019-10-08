@@ -118,12 +118,29 @@ class TestApproach:
         ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
 
         # SOTA - Gomez et. al. HAC and Log-Entropy with 20k features
-        sota_pred_path = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-                          r"\clusterPAN2017-master\output_LogEnt"
-                          f"\\problem{ps:03d}\\clustering.json")
-        sota_predicted = Tools.load_true_clusters_into_vector(sota_pred_path)
-        sota_pred, sota_evals = clu_lss.eval_sota(
-                sota_predicted=sota_predicted)
+        sota_pred_path_le = (r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                             r"\Code\clusterPAN2017-master\output_LogEnt"
+                             f"\\problem{ps:03d}\\clustering.json")
+        sota_predicted_le = Tools.load_true_clusters_into_vector(
+                sota_pred_path_le)
+        sota_pred_le, sota_evals_le = clu_lss.eval_sota(
+                sota_predicted=sota_predicted_le)
+
+        sota_pred_path_tf = (r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                             r"\Code\clusterPAN2017-master\output_Tf"
+                             f"\\problem{ps:03d}\\clustering.json")
+        sota_predicted_tf = Tools.load_true_clusters_into_vector(
+                sota_pred_path_tf)
+        sota_pred_tf, sota_evals_tf = clu_lss.eval_sota(
+                sota_predicted=sota_predicted_tf)
+
+        sota_pred_path_tfidf = (r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                                r"\Code\clusterPAN2017-master\output_TfIdf"
+                                f"\\problem{ps:03d}\\clustering.json")
+        sota_predicted_tfidf = Tools.load_true_clusters_into_vector(
+                sota_pred_path_tfidf)
+        sota_pred_tfidf, sota_evals_tfidf = clu_lss.eval_sota(
+                sota_predicted=sota_predicted_tfidf)
 
         if desired_k != 0:
             k_trend = clu_lss.cand_k
@@ -138,14 +155,17 @@ class TestApproach:
                         norm_ms_evals,  # norm_xm_evals,
                         nhac_complete_evals, nhac_s_evals, nhac_a_evals,
                         n_optics_evals, bl_rand_evals, bl_singleton_evals,
-                        nhdp_evals, sota_evals, ntrue_evals
+                        nhdp_evals,
+                        sota_evals_tf, sota_evals_tfidf, sota_evals_le,
+                        ntrue_evals
                         ],
                 identifiers=[  # "iSpKmeans",
                              "E_SPKMeans", "E_HDBSCAN",
                              "E_Mean_Shift",  # "XMeans",
                              "E_HAC_C", "E_HAC_Single", "E_HAC_Average",
-                             "E_OPTICS", "BL_r", "BL_s",
-                             "S_HDP", "BL_SOTA", "Labels"],
+                             "E_OPTICS", "BL_r", "BL_s", "S_HDP",
+                             "BL_SOTA_tf", "BL_SOTA_tfidf", "BL_SOTA_le",
+                             "Labels"],
                 problem_set=ps)
 
         return result, k_trend
@@ -156,13 +176,15 @@ class TestApproach:
                       results: List[Dict],
                       k_values: List[List]):
 
-        Tools.splice_save_problemsets_dictionaries(
+        path = Tools.splice_save_problemsets_dictionaries(
                 results,
                 metadata_fpath=info_path,
                 suffix=suffix,
                 test_data=True)
 
         Tools.save_k_vals_as_df(k_vals=k_values, suffix=suffix, test_data=True)
+
+        return path
 
     def run_test(self,
                  configuration: str,
@@ -209,10 +231,12 @@ class TestApproach:
             k_vals.append(k_trends)
 
         print("\nSaving Results ..")
-        tester._save_results(suffix=f"{save_name_suff}_{configuration}",
-                             info_path=r"..\..\Datasets\pan17_test\info.json",
-                             results=problemsets_results,
-                             k_values=k_vals)
+        path = tester._save_results(
+                suffix=f"{save_name_suff}_{configuration}",
+                info_path=r"..\..\Datasets\pan17_test\info.json",
+                results=problemsets_results,
+                k_values=k_vals)
+        return path
 
 
 if __name__ == "__main__":
@@ -222,44 +246,54 @@ if __name__ == "__main__":
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
-    print("========== NEUTRAL ==========")
-    tester.run_test(configuration=TestApproach.config_neutral,
-                    drop_uncommon=True,
-                    save_name_suff="_final",
-                    infer=False,
-                    desired_k=None)
-    print("========== DENSE ==========")
-    tester.run_test(configuration=TestApproach.config_dense,
-                    drop_uncommon=True,
-                    save_name_suff="_final",
-                    infer=False,
-                    desired_k=None)
+# =============================================================================
+#     print("========== NEUTRAL ==========")
+#     tester.run_test(configuration=TestApproach.config_neutral,
+#                     drop_uncommon=True,
+#                     save_name_suff="_final",
+#                     infer=False,
+#                     desired_k=None)
+#     print("========== DENSE ==========")
+#     tester.run_test(configuration=TestApproach.config_dense,
+#                     drop_uncommon=True,
+#                     save_name_suff="_final",
+#                     infer=False,
+#                     desired_k=None)
+# =============================================================================
     print("========== SPARSE ==========")
-    tester.run_test(configuration=TestApproach.config_sparse,
-                    drop_uncommon=True,
-                    save_name_suff="_final",
-                    infer=False,
-                    desired_k=None)
+    sparse = tester.run_test(
+            configuration=TestApproach.config_sparse,
+            drop_uncommon=True,
+            save_name_suff="_final",
+            infer=False,
+            desired_k=None)
+
+    # Run Friedman-Nemenyi test with Bonferroni correction for multiple tests
+    # since the dataset is the same if ARI is included
+    print(Tools.friedman_nemenyi_bonferroni_tests(
+            data_path=sparse, save_outputs=True))
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬Using True K ▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
-    print("========== NEUTRAL-K ==========")
-    tester.run_test(configuration=TestApproach.config_neutral,
-                    drop_uncommon=True,
-                    save_name_suff="_final_trueK",
-                    infer=False,
-                    desired_k=0)
-    print("========== DENSE-K ==========")
-    tester.run_test(configuration=TestApproach.config_dense,
-                    drop_uncommon=True,
-                    save_name_suff="_final_trueK",
-                    infer=False,
-                    desired_k=0)
-    print("========== SPARSE-K ==========")
-    tester.run_test(configuration=TestApproach.config_sparse,
-                    drop_uncommon=True,
-                    save_name_suff="_final_trueK",
-                    infer=False,
-                    desired_k=0)
+# =============================================================================
+#     print("========== NEUTRAL-K ==========")
+#     tester.run_test(configuration=TestApproach.config_neutral,
+#                     drop_uncommon=True,
+#                     save_name_suff="_final_trueK",
+#                     infer=False,
+#                     desired_k=0)
+#     print("========== DENSE-K ==========")
+#     tester.run_test(configuration=TestApproach.config_dense,
+#                     drop_uncommon=True,
+#                     save_name_suff="_final_trueK",
+#                     infer=False,
+#                     desired_k=0)
+#     print("========== SPARSE-K ==========")
+#     tester.run_test(configuration=TestApproach.config_sparse,
+#                     drop_uncommon=True,
+#                     save_name_suff="_final_trueK",
+#                     infer=False,
+#                     desired_k=0)
+# =============================================================================
 
     print("\n▬▬▬▬▬▬▬▬▬▬▬▬(FINISHED)▬▬▬▬▬▬▬▬▬▬▬")

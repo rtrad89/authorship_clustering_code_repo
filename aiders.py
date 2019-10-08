@@ -187,6 +187,7 @@ class Tools:
             df.sort_values(by=["set", "bcubed_fscore"], ascending=[True, False]
                            ).to_csv(path_or_buf=path,
                                     index=False)
+        return path
 
     @staticmethod
     def test_power_law_dist(true_labels_dir: str):
@@ -245,13 +246,13 @@ class Tools:
                           suffix="",
                           test_data: bool = False):
         df_k_vals = pd.DataFrame(k_vals,
-                                 columns=["Est_k",
+                                 columns=["E_SPKMeans",
                                           "Gap",
                                           "G-means",
-                                          "Hac_c",
-                                          "Hac_s",
-                                          "Hac_a",
-                                          "OPTICS",
+                                          "E_HAC_C",
+                                          "E_HAC_S",
+                                          "E_HAC_A",
+                                          "E_OPTICS",
                                           "TRUE"])
 
         timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
@@ -264,32 +265,29 @@ class Tools:
 
     @staticmethod
     def friedman_nemenyi_bonferroni_tests(
-            data_path: str, save_outputs: bool = False):
+            data_path: str, ari_included=False, save_outputs: bool = False):
         # Load the data from disk
         df = pd.read_csv(data_path, low_memory=False)
+
+        if ari_included:
+            alpha = .05 / 2.0  # Bonferroni Correction with 2 tests
+        else:
+            alpha = .05
+
         # Reshape the results so that the treatments (algorithms) are in
         # arranged in a columnar fashion
         pvt_b3f = df.pivot_table(
                 values="bcubed_fscore", columns="algorithm", index="set")
-        pvt_ari = df.pivot_table(
-                values="ari", columns="algorithm", index="set")
 
         pvt_b3f.drop(
-                columns=["HAC_Average", "HAC_Single", "HDBSCAN", "Labels"],
+                columns=["E_HAC_Average", "E_HAC_Single", "E_HDBSCAN",
+                         "Labels"],
                 inplace=True)
-        pvt_ari.drop(
-                columns=["HAC_Average", "HAC_Single", "HDBSCAN", "Labels"],
-                inplace=True)
-
-        alpha = .05 / 2.0  # Bonferroni Correction with 2 tests
 
         stat_b3f, p_b3f = friedmanchisquare(*pvt_b3f.T.values)
-        stat_ari, p_ari = friedmanchisquare(*pvt_ari.T.values)
-
         sig_b3f = p_b3f <= alpha
-        sig_ari = p_ari <= alpha
 
-        posthoc_b3f, posthoc_ari = None, None
+        posthoc_b3f = None
         if sig_b3f:
             # The omnibus test succeeded, drilling down to the posthoc test
             posthoc_b3f = posthoc_nemenyi_friedman(pvt_b3f)
@@ -297,15 +295,31 @@ class Tools:
                 posthoc_b3f.to_csv(
                         r"./__outputs__/TESTS"
                         f"/Friedman_Nemenyi_B3F_a_{alpha:0.4f}.csv")
-        if sig_ari:
-            # The omnibus test succeeded, drilling down to the posthoc test
-            posthoc_ari = posthoc_nemenyi_friedman(pvt_ari)
-            if save_outputs:
-                posthoc_ari.to_csv(
-                        r"./__outputs__/TESTS/"
-                        f"Friedman_Nemenyi_ARI_a_{alpha:0.4f}.csv")
 
-        return alpha, sig_b3f, posthoc_b3f, sig_ari, posthoc_ari
+        if ari_included:
+            pvt_ari = df.pivot_table(
+                    values="ari", columns="algorithm", index="set")
+            pvt_ari.drop(
+                    columns=["E_HAC_Average", "E_HAC_Single", "E_HDBSCAN",
+                             "Labels"],
+                    inplace=True)
+            stat_ari, p_ari = friedmanchisquare(*pvt_ari.T.values)
+            sig_ari = p_ari <= alpha
+            posthoc_ari = None
+            if sig_ari:
+                # The omnibus test succeeded, drilling down to the posthoc test
+                posthoc_ari = posthoc_nemenyi_friedman(pvt_ari)
+                if save_outputs:
+                    posthoc_ari.to_csv(
+                            r"./__outputs__/TESTS/"
+                            f"Friedman_Nemenyi_ARI_a_{alpha:0.4f}.csv")
+
+        if ari_included:
+            ret = alpha, sig_b3f, posthoc_b3f, sig_ari, posthoc_ari
+        else:
+            ret = alpha, sig_b3f, posthoc_b3f
+
+        return ret
 
     @staticmethod
     def calc_rmse(x: pd.Series,

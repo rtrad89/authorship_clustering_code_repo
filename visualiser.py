@@ -126,13 +126,13 @@ class Visualiser():
         if concise:
             df_neutral_res = df_neutral_res[
                     ~df_neutral_res.algorithm.isin(
-                            ["HDBSCAN", "HAC_Single", "HAC_Average"])]
+                            ["E_HDBSCAN", "E_HAC_Single", "E_HAC_Average"])]
             df_sparse_res = df_sparse_res[
                     ~df_sparse_res.algorithm.isin(
-                            ["HDBSCAN", "HAC_Single", "HAC_Average"])]
+                            ["E_HDBSCAN", "E_HAC_Single", "E_HAC_Average"])]
             df_dense_res = df_dense_res[
                     ~df_dense_res.algorithm.isin(
-                            ["HDBSCAN", "HAC_Single", "HAC_Average"])]
+                            ["E_HDBSCAN", "E_HAC_Single", "E_HAC_Average"])]
 
         if test_style:
             df_all = df_sparse_res
@@ -144,7 +144,8 @@ class Visualiser():
                     ).reset_index(level=0).rename(
                             columns={"level_0": "topics_prior"})
 
-        algo_order = ["BL_r", "BL_s", "BL_SOTA",
+        algo_order = ["BL_r", "BL_s", "BL_SOTA_tf",
+                      "BL_SOTA_tfidf", "BL_SOTA_le",
                       "S_HDP",
                       "E_HAC_C", "E_Mean_Shift", "E_OPTICS", "E_SPKMeans"]
 
@@ -339,9 +340,12 @@ class Visualiser():
                          key_suff: str):
         if concise:
             k_vals = pd.read_csv(k_vals_path, low_memory=False,
-                                 usecols=["Est_k", "Gap",
-                                          "G-means", "Hac_c", "OPTICS",
-                                          "TRUE"])
+                                 usecols=["Gap", "G-means", "E_SPKMeans",
+                                          "E_HAC_C", "E_OPTICS",
+                                          "TRUE"]
+                                 )[
+            ["Gap", "G-means", "E_SPKMeans",
+             "E_HAC_C", "E_OPTICS", "TRUE"]]
         else:
             k_vals = pd.read_csv(k_vals_path, low_memory=False, index_col=0)
 
@@ -356,25 +360,25 @@ class Visualiser():
                                figsize=self.rectangle,
                                sharex="col")
 
-        sns.scatterplot(x="TRUE", y="Est_k", color=".0",
+        sns.scatterplot(x="TRUE", y="E_SPKMeans", color=".0",
                         marker="X",
                         ax=ax[0],
                         data=k_vals)
-        sns.scatterplot(x="TRUE", y="Hac_c", color=".0",
+        sns.scatterplot(x="TRUE", y="E_HAC_C", color=".0",
                         marker="P",
                         ax=ax[1],
                         data=k_vals)
-        sns.scatterplot(x="TRUE", y="OPTICS", color=".0",
+        sns.scatterplot(x="TRUE", y="E_OPTICS", color=".0",
                         marker="^",
                         ax=ax[2],
                         data=k_vals)
 
         if not concise:
-            sns.scatterplot(x="TRUE", y="Hac_s", color=".0",
+            sns.scatterplot(x="TRUE", y="E_HAC_S", color=".0",
                             marker="s",
                             ax=ax[1, 1],
                             data=k_vals)
-            sns.scatterplot(x="TRUE", y="Hac_a", color=".0",
+            sns.scatterplot(x="TRUE", y="E_HAC_A", color=".0",
                             marker="o",
                             ax=ax[1, 2],
                             data=k_vals)
@@ -391,10 +395,24 @@ class Visualiser():
             rmse.update({col: Tools.calc_rmse(k_vals["TRUE"], k_vals[col])})
 
         # Add SOTA estimations
-        sota_pred = Tools.get_sota_est_k(
+        sota_pred_le = Tools.get_sota_est_k(
                 output_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
                              r"\Code\clusterPAN2017-master\output_LogEnt"))
-        rmse.update({"BL_SOTA": Tools.calc_rmse(k_vals["TRUE"], sota_pred)})
+        rmse.update(
+                {"BL_SOTA_le": Tools.calc_rmse(k_vals["TRUE"], sota_pred_le)})
+
+        sota_pred_tf = Tools.get_sota_est_k(
+                output_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                             r"\Code\clusterPAN2017-master\output_Tf"))
+        rmse.update(
+                {"BL_SOTA_tf": Tools.calc_rmse(k_vals["TRUE"], sota_pred_tf)})
+
+        sota_pred_tfidf = Tools.get_sota_est_k(
+                output_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                             r"\Code\clusterPAN2017-master\output_TfIdf"))
+        rmse.update(
+                {"BL_SOTA_tfidf": Tools.calc_rmse(
+                        k_vals["TRUE"], sota_pred_tfidf)})
 
         df_rmse = pd.DataFrame(data=rmse, index=[0]).T
         df_rmse.columns = ["RMSE"]
@@ -450,35 +468,53 @@ class Visualiser():
 
     def visualise_nemenyi_post_hoc(self,
                                    b3f_path: str,
-                                   ari_path: str):
-        df_b3f = pd.read_csv(b3f_path, low_memory=True, index_col=0)
-        df_b3f = df_b3f.sort_index().sort_index(axis=1)
-        df_ari = pd.read_csv(ari_path, low_memory=True, index_col=0)
-        df_ari = df_ari.sort_index().sort_index(axis=1)
+                                   a: float,
+                                   ari_path: str = None):
+        if ari_path is None:
+            df_b3f = pd.read_csv(b3f_path, low_memory=True, index_col=0)
+            df_b3f = df_b3f.sort_index().sort_index(axis=1)
+            fig_nemenyi, ax_nemenyi = plt.subplots(nrows=1,
+                                                   ncols=1,
+                                                   clear=True,
+                                                   sharey="row",
+                                                   figsize=self.square)
+            sns.heatmap((abs(df_b3f)), annot=True, center=a,
+                        cbar=False, linewidths=0.5, fmt="0.3f", square=True,
+                        cmap=ListedColormap(["#68b025", "#dadce0"]),
+                        ax=ax_nemenyi)
+            ax_nemenyi.set_title("bcubed_fscore")
+        else:
+            df_b3f = pd.read_csv(b3f_path, low_memory=True, index_col=0)
+            df_b3f = df_b3f.sort_index().sort_index(axis=1)
+            df_ari = pd.read_csv(ari_path, low_memory=True, index_col=0)
+            df_ari = df_ari.sort_index().sort_index(axis=1)
+            fig_nemenyi, ax_nemenyi = plt.subplots(nrows=1,
+                                                   ncols=2,
+                                                   clear=True,
+                                                   sharey="row",
+                                                   figsize=self.double_square)
 
-        fig_nemenyi, ax_nemenyi = plt.subplots(nrows=1,
-                                               ncols=2,
-                                               clear=True,
-                                               sharey="row",
-                                               figsize=self.double_square)
-
-        sns.heatmap((abs(df_b3f)), annot=True, center=0.025,
-                    cbar=False, linewidths=0.5, fmt="0.3f", square=True,
-                    cmap=ListedColormap(["#68b025", "#dadce0"]),
-                    ax=ax_nemenyi[0])
-        ax_nemenyi[0].set_title("bcubed_fscore")
-        sns.heatmap((abs(df_ari)), annot=True, center=0.025,
-                    cbar=False, linewidths=0.5, fmt="0.3f", square=True,
-                    cmap=ListedColormap(["#68b025", "#dadce0"]),
-                    ax=ax_nemenyi[1])
-        ax_nemenyi[1].set_title("ari")
+            sns.heatmap((abs(df_b3f)), annot=True, center=a,
+                        cbar=False, linewidths=0.5, fmt="0.3f", square=True,
+                        cmap=ListedColormap(["#68b025", "#dadce0"]),
+                        ax=ax_nemenyi[0])
+            ax_nemenyi[0].set_title("bcubed_fscore")
+            sns.heatmap((abs(df_ari)), annot=True, center=a,
+                        cbar=False, linewidths=0.5, fmt="0.3f", square=True,
+                        cmap=ListedColormap(["#68b025", "#dadce0"]),
+                        ax=ax_nemenyi[1])
+            ax_nemenyi[1].set_title("ari")
 
         plt.tight_layout()
         plt.show()
         plt.close()
 
         self.figs.update({"Nemenyi_post_hoc": fig_nemenyi})
-        return fig_nemenyi, df_b3f, df_ari
+
+        if ari_path:
+            return fig_nemenyi, df_b3f, df_ari
+        else:
+            return fig_nemenyi, df_b3f
 
     def serialise_figs(self,
                        out_dir: str = r".\__outputs__\charts",
@@ -509,40 +545,42 @@ class Visualiser():
 if __name__ == "__main__":
     print("Starting visualisations..")
 
-    # Locate the files to analyse:
-    # First the training data
-    sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-              r"\authorship_clustering_code_repo\__outputs__"
-              r"\results_20190924_213257_training_sparse_common.csv")
-    dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-             r"\authorship_clustering_code_repo\__outputs__"
-             r"\results_20190924_213715_training_dense_common.csv")
-    neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-               r"\authorship_clustering_code_repo\__outputs__"
-               r"\results_20190924_211938_training_neutral_common.csv")
-
-    k_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-                r"\authorship_clustering_code_repo\__outputs__"
-                r"\k_trend_20190924_213257_training_sparse_common.csv")
-    k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-               r"\authorship_clustering_code_repo\__outputs__"
-               r"\k_trend_20190924_213715_training_dense_common.csv")
-    k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-                 r"\authorship_clustering_code_repo\__outputs__"
-                 r"\k_trend_20190924_211938_training_neutral_common.csv")
-
-    trace_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
-                    r"\pan17_train\problem015"
-                    r"\hdp_lss_0.30_0.10_0.10_common_True"
-                    r"\state.log")
-    trace_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
-                   r"\pan17_train\problem015"
-                   r"\hdp_lss_0.80_1.50_1.50_common_True"
-                   r"\state.log")
-    trace_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
-                     r"\pan17_train\problem015"
-                     r"\hdp_lss_0.50_1.00_1.00_common_True"
-                     r"\state.log")
+# =============================================================================
+#     # Locate the files to analyse:
+#     # First the training data
+#     sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+#               r"\authorship_clustering_code_repo\__outputs__"
+#               r"\results_20190924_213257_training_sparse_common.csv")
+#     dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+#              r"\authorship_clustering_code_repo\__outputs__"
+#              r"\results_20190924_213715_training_dense_common.csv")
+#     neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+#                r"\authorship_clustering_code_repo\__outputs__"
+#                r"\results_20190924_211938_training_neutral_common.csv")
+#
+#     k_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+#                 r"\authorship_clustering_code_repo\__outputs__"
+#                 r"\k_trend_20190924_213257_training_sparse_common.csv")
+#     k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+#                r"\authorship_clustering_code_repo\__outputs__"
+#                r"\k_trend_20190924_213715_training_dense_common.csv")
+#     k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+#                  r"\authorship_clustering_code_repo\__outputs__"
+#                  r"\k_trend_20190924_211938_training_neutral_common.csv")
+#
+#     trace_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
+#                     r"\pan17_train\problem015"
+#                     r"\hdp_lss_0.30_0.10_0.10_common_True"
+#                     r"\state.log")
+#     trace_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
+#                    r"\pan17_train\problem015"
+#                    r"\hdp_lss_0.80_1.50_1.50_common_True"
+#                    r"\state.log")
+#     trace_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
+#                      r"\pan17_train\problem015"
+#                      r"\hdp_lss_0.50_1.00_1.00_common_True"
+#                      r"\state.log")
+# =============================================================================
 
     # Analyse charts and construct the cached pool:
     vis = Visualiser(scale=1.2)
@@ -554,24 +592,22 @@ if __name__ == "__main__":
 #                         dense_path=dense,
 #                         neutral_path=neutral,
 #                         key_suff="_training_est_k")
-# 
+#
 #     vis.analyse_k_trends(concise=True,
 #                          k_vals_path=k_sparse,
 #                          key_suff="_training_sparse")
 #     vis.plot_gibbs_trace(state_path=trace_sparse,
 #                          key_suff="_training_sparse")
-# 
+#
 #     vis.analyse_k_trends(concise=True,
 #                          k_vals_path=k_dense,
 #                          key_suff="_training_dense")
 #     vis.plot_gibbs_trace(state_path=trace_dense,
 #                          key_suff="_training_dense")
-# =============================================================================
-
-    vis.analyse_k_trends(concise=True,
-                         k_vals_path=k_neutral,
-                         key_suff="_training_neutral")
-# =============================================================================
+#
+#     vis.analyse_k_trends(concise=True,
+#                          k_vals_path=k_neutral,
+#                          key_suff="_training_neutral")
 #     vis.plot_gibbs_trace(state_path=trace_neutral,
 #                          key_suff="_training_neutral")
 # =============================================================================
@@ -579,23 +615,23 @@ if __name__ == "__main__":
     # Now the test data
     sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
               r"\authorship_clustering_code_repo\__outputs__\TESTS"
-              r"\results_20190923_234123_final_sparse.csv")
+              r"\results_20191008_223416_final_sparse.csv")
     dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
              r"\authorship_clustering_code_repo\__outputs__\TESTS"
-             r"\results_20190923_231000_final_dense.csv")
+             r"\results_20191008_155035_final_dense.csv")
     neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__\TESTS"
-               r"\results_20190923_225951_final_neutral.csv")
+               r"\results_20191008_154252_final_neutral.csv")
 
     k_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                 r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                r"\k_trend_20190923_234123_final_sparse.csv")
+                r"\k_trend_20191008_161955_final_sparse.csv")
     k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__\TESTS"
-               r"\k_trend_20190923_231000_final_dense.csv")
+               r"\k_trend_20191008_155035_final_dense.csv")
     k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                  r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                 r"\k_trend_20190923_225952_final_neutral.csv")
+                 r"\k_trend_20191008_154252_final_neutral.csv")
 
     trace_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
                     r"\pan17_test\problem015\lss_0.30_0.10_0.10_common_True"
@@ -609,68 +645,57 @@ if __name__ == "__main__":
 
     sparse_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                      r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                     r"\results_20190923_235606_final_trueK_sparse.csv")
+                     r"\results_20191008_162823_final_trueK_sparse.csv")
     dense_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                     r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                    r"\results_20190923_235117_final_trueK_dense.csv")
+                    r"\results_20191008_162544_final_trueK_dense.csv")
     neutral_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                       r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                      r"\results_20190923_234615_final_trueK_neutral.csv")
+                      r"\results_20191008_162304_final_trueK_neutral.csv")
 
-# =============================================================================
-#     vis.visualise_cluster_sizes_hist(
-#             train_only=False,
-#             train_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
-#                         r"\Datasets\pan17_train"),
-#             test_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
-#                        r"\Datasets\pan17_test")
-#             )
-# 
-#     vis.analyse_results(concise=True,
-#                         test_style=True,
-#                         sparse_path=sparse,
-#                         dense_path=dense,
-#                         neutral_path=neutral,
-#                         key_suff="_est_k")
-# =============================================================================
+    vis.visualise_cluster_sizes_hist(
+            train_only=False,
+            train_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                        r"\Datasets\pan17_train"),
+            test_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                       r"\Datasets\pan17_test")
+            )
+
+    vis.analyse_results(concise=True,
+                        test_style=True,
+                        sparse_path=sparse,
+                        dense_path=dense,
+                        neutral_path=neutral,
+                        key_suff="_est_k")
 
     vis.analyse_k_trends(concise=True,
                          k_vals_path=k_sparse,
                          key_suff="_sparse")
-# =============================================================================
-#     vis.plot_gibbs_trace(state_path=trace_sparse,
-#                          key_suff="_sparse")
-# 
-#     vis.analyse_k_trends(concise=True,
-#                          k_vals_path=k_dense,
-#                          key_suff="_dense")
-#     vis.plot_gibbs_trace(state_path=trace_dense,
-#                          key_suff="_dense")
-# 
-#     vis.analyse_k_trends(concise=True,
-#                          k_vals_path=k_neutral,
-#                          key_suff="_neutral")
-#     vis.plot_gibbs_trace(state_path=trace_neutral,
-#                          key_suff="_neutral")
-# 
-#     vis.analyse_results(concise=True,
-#                         test_style=True,
-#                         sparse_path=sparse_true_k,
-#                         dense_path=dense_true_k,
-#                         neutral_path=neutral_true_k,
-#                         key_suff="_true_k")
-#     vis.visualise_nemenyi_post_hoc(
-#             b3f_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
-#                       r"\Code\authorship_clustering_code_repo\__outputs__"
-#                       r"\TESTS\Friedman_Nemenyi_B3F_a_0.0250.csv"),
-#             ari_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
-#                       r"\Code\authorship_clustering_code_repo\__outputs__"
-#                       r"\TESTS\Friedman_Nemenyi_ARI_a_0.0250.csv")
-#             )
-#     # Serialise the cached pool to disk
-#     vis.serialise_figs(charts_format="eps")
-# =============================================================================
-    # Run Friedman-Nemenyi test with Bonferroni correction for multiple tests
-    # since the dataset is the same
-    print(Tools.friedman_nemenyi_bonferroni_tests(
-            data_path=sparse, save_outputs=False))
+    vis.plot_gibbs_trace(state_path=trace_sparse,
+                         key_suff="_sparse")
+
+    vis.analyse_k_trends(concise=True,
+                         k_vals_path=k_dense,
+                         key_suff="_dense")
+    vis.plot_gibbs_trace(state_path=trace_dense,
+                         key_suff="_dense")
+
+    vis.analyse_k_trends(concise=True,
+                         k_vals_path=k_neutral,
+                         key_suff="_neutral")
+    vis.plot_gibbs_trace(state_path=trace_neutral,
+                         key_suff="_neutral")
+
+    vis.analyse_results(concise=True,
+                        test_style=True,
+                        sparse_path=sparse_true_k,
+                        dense_path=dense_true_k,
+                        neutral_path=neutral_true_k,
+                        key_suff="_true_k")
+    vis.visualise_nemenyi_post_hoc(
+            b3f_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                      r"\Code\authorship_clustering_code_repo\__outputs__"
+                      r"\TESTS\Friedman_Nemenyi_B3F_a_0.0500.csv"),
+                      a=0.05)
+    # Serialise the cached pool to disk
+#    vis.serialise_figs(charts_format="eps")
