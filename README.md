@@ -1,3 +1,3 @@
-# Authorial Clustering on Short X-topic Texts Using Non-sparse Non-parametric Low-dimensional Topic Modelling Representation
+# Authorial Clustering of Short Texts With Non-parametric Topic Models
 
-Still in progress.. expected to complete in Nov 2019.
+Still in progress.. expected to complete in 2019.
