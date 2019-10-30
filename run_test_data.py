@@ -80,6 +80,7 @@ class TestApproach:
                             metric="cosine",
                             desired_n_clusters=desired_k)
 
+        # Run SPKMeans 10 times to get mean performance
         norm_spk_pred, norm_spk_evals = clu_lss.evaluate(
                 alg_option=Clusterer.alg_spherical_k_means,
                 param_init="k-means++")
@@ -142,6 +143,7 @@ class TestApproach:
         sota_pred_tfidf, sota_evals_tfidf = clu_lss.eval_sota(
                 sota_predicted=sota_predicted_tfidf)
 
+        # Control whether k is estimated or it is the true k replicated:
         if desired_k != 0:
             k_trend = clu_lss.cand_k
             k_trend.append(1 + max(clu_lss.true_labels))
@@ -211,7 +213,7 @@ class TestApproach:
         problemsets_results = []
         k_vals = []
         for ps in range(1, 121):
-            print(f"Vectorising problem set ► {ps:03d} ◄ ..")
+            print(f"\nVectorising problem set ► {ps:03d} ◄ ..")
             plain_docs, bow_rep_docs, lss_rep_docs = tester._vectorise_ps(
                     ps,
                     infer_lss=infer,
@@ -222,7 +224,7 @@ class TestApproach:
             lss_rep_docs = Tools.normalise_data(lss_rep_docs)
 
             # Begin Clustering Attempts
-            print("\nClustering ..")
+            print("Clustering ..")
             ground_truth = self._get_ps_truth(ps)
             ps_res, k_trends = tester._cluster_data(ps, data=lss_rep_docs,
                                                     ground_truth=ground_truth,
@@ -259,41 +261,39 @@ if __name__ == "__main__":
 #                     save_name_suff="_final",
 #                     infer=False,
 #                     desired_k=None)
+#     print("========== SPARSE ==========")
+#     sparse = tester.run_test(
+#             configuration=TestApproach.config_sparse,
+#             drop_uncommon=True,
+#             save_name_suff="_final",
+#             infer=False,
+#             desired_k=None)
+#
+#     # Run Friedman-Nemenyi test with Bonferroni correction for multiple tests
+#     # since the dataset is the same if ARI is included
+#     print(Tools.friedman_nemenyi_bonferroni_tests(
+#             data_path=sparse, save_outputs=True))
 # =============================================================================
-    print("========== SPARSE ==========")
-    sparse = tester.run_test(
-            configuration=TestApproach.config_sparse,
-            drop_uncommon=True,
-            save_name_suff="_final",
-            infer=False,
-            desired_k=None)
-
-    # Run Friedman-Nemenyi test with Bonferroni correction for multiple tests
-    # since the dataset is the same if ARI is included
-    print(Tools.friedman_nemenyi_bonferroni_tests(
-            data_path=sparse, save_outputs=True))
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬Using True K ▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
-# =============================================================================
-#     print("========== NEUTRAL-K ==========")
-#     tester.run_test(configuration=TestApproach.config_neutral,
-#                     drop_uncommon=True,
-#                     save_name_suff="_final_trueK",
-#                     infer=False,
-#                     desired_k=0)
-#     print("========== DENSE-K ==========")
-#     tester.run_test(configuration=TestApproach.config_dense,
-#                     drop_uncommon=True,
-#                     save_name_suff="_final_trueK",
-#                     infer=False,
-#                     desired_k=0)
-#     print("========== SPARSE-K ==========")
-#     tester.run_test(configuration=TestApproach.config_sparse,
-#                     drop_uncommon=True,
-#                     save_name_suff="_final_trueK",
-#                     infer=False,
-#                     desired_k=0)
-# =============================================================================
+    print("========== NEUTRAL-K ==========")
+    tester.run_test(configuration=TestApproach.config_neutral,
+                    drop_uncommon=True,
+                    save_name_suff="_final_trueK",
+                    infer=False,
+                    desired_k=0)
+    print("========== DENSE-K ==========")
+    tester.run_test(configuration=TestApproach.config_dense,
+                    drop_uncommon=True,
+                    save_name_suff="_final_trueK",
+                    infer=False,
+                    desired_k=0)
+    print("========== SPARSE-K ==========")
+    tester.run_test(configuration=TestApproach.config_sparse,
+                    drop_uncommon=True,
+                    save_name_suff="_final_trueK",
+                    infer=False,
+                    desired_k=0)
 
     print("\n▬▬▬▬▬▬▬▬▬▬▬▬(FINISHED)▬▬▬▬▬▬▬▬▬▬▬")

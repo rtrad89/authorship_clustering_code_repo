@@ -274,10 +274,12 @@ class Tools:
         else:
             alpha = .05
 
-        # Reshape the results so that the treatments (algorithms) are in
+        # Reshape the results so that the treatments (algorithms) are
         # arranged in a columnar fashion
         pvt_b3f = df.pivot_table(
-                values="bcubed_fscore", columns="algorithm", index="set")
+                values="bcubed_fscore", columns="algorithm",
+                index=["language", "genre"])
+        pvt_b3f.index = pvt_b3f.index.map("_".join)
 
         pvt_b3f.drop(
                 columns=["E_HAC_Average", "E_HAC_Single", "E_HDBSCAN",
@@ -298,7 +300,10 @@ class Tools:
 
         if ari_included:
             pvt_ari = df.pivot_table(
-                    values="ari", columns="algorithm", index="set")
+                    values="ari", columns="algorithm",
+                    index=["language", "genre"])
+            pvt_ari.index = pvt_ari.index.map("_".join)
+
             pvt_ari.drop(
                     columns=["E_HAC_Average", "E_HAC_Single", "E_HDBSCAN",
                              "Labels"],

@@ -26,7 +26,6 @@ from spherecluster import SphericalKMeans
 from gap_statistic import OptimalK
 from gmeans import GMeans
 import random
-from collections import defaultdict
 
 
 class Clusterer:
@@ -81,7 +80,9 @@ class Clusterer:
                 self.k = desired_n_clusters
                 self.estimated_k = False
             else:
-                # Estimate k using on L2 normalised data in spherical k-means
+                # Estimate k using on L2 normalised data
+                self.k, self.cand_k = self._estimate_k(include_bic=include_bic,
+                                                       include_gap=include_gap)
                 self.estimated_k = True
         else:
             print("\nERROR: cannot create class.\n"
@@ -99,7 +100,7 @@ class Clusterer:
             Note: the data would be L2-normalised before proceeding
 
         """
-        gmeans = GMeans(random_state=None, max_depth=500)
+        gmeans = GMeans(random_state=137, max_depth=500)
         gmeans.fit(self.data)
         k_gaussian = len(unique(gmeans.labels_))
 
@@ -121,8 +122,6 @@ class Clusterer:
                 est_k = round((k_gap + k_gaussian) / 2)
                 return (est_k,
                         [est_k, k_gap, k_gaussian])
-        # TODO: None gap stats would generate errors when averaging
-        # to form k-trends
         else:
             if include_bic:
                 k_bic = len(unique(self._cluster_xmeans()))
@@ -130,7 +129,7 @@ class Clusterer:
                 return (est_k,
                         [est_k, k_bic, None, k_gaussian])
             else:
-                est_k = round(k_gaussian)
+                est_k = k_gaussian
                 return (est_k,
                         [est_k, None, k_gaussian])
 
@@ -209,42 +208,22 @@ class Clusterer:
 
     def _cluster_spherical_kmeans(self,
                                   init: str = "k-means++",
-                                  runs: int = 5):
+                                  force_k: int = None):
         """
         Employ spherical k-means on L2 normalised directional data points. The
         algorithm uses cosine distances internally, and is especially suited
-        to textual high dimentional data. Since it exploits randomness in
-        initialisations and estimations of k, we avergare over 10 runs to
-        increase the reliability and reproducibility of results.
+        to textual high dimentional data.
 
-        Returns
-        -------
-            A array of clusterings with many runs to estimate k
         """
-
-        # Pay attention that k-means++ initialiser may be using Eucledian
-        # distances still.. but l2 norms approx
-        preds = []
-        if self.estimated_k:
-            cands = []
-            for rc in range(0, runs):
-                n, cand = self._estimate_k(include_bic=self.bic,
-                                           include_gap=self.gap)
-                cands.append(cand)
-                skm = SphericalKMeans(n_clusters=n, init=init,
-                                      random_state=None, normalize=False)
-                preds.append(skm.fit_predict(self.data))
-
-            # Append the average of candidate k over runs
-            self.cand_k = list(pd.np.mean(cands, axis=0))
-            self.k = round(self.cand_k[0])
+        if force_k:
+            n = force_k
         else:
-            for rc in range(0, runs):
-                skm = SphericalKMeans(n_clusters=self.k, init=init,
-                                      random_state=None, normalize=False)
-                preds.append(skm.fit_predict(self.data))
-
-        return preds
+            n = self.k
+        # Pay attention that k-means++ initialiser may be using Eucledian
+        # distances still..
+        skm = SphericalKMeans(n_clusters=n, init=init, n_init=1000,
+                              random_state=13712, normalize=False)
+        return skm.fit_predict(self.data)
 
     def _cluster_ispherical_kmeans(self,
                                    init: str = "k-means++"):
@@ -500,7 +479,6 @@ class Clusterer:
             clustering_labels = self._cluster_optics()
 
         elif alg_option == Clusterer.alg_spherical_k_means:
-            # Here an array will be returned
             clustering_labels = self._cluster_spherical_kmeans(
                     init=param_init)
 
@@ -517,47 +495,17 @@ class Clusterer:
             return None
 
         if clustering_labels is not None:
-            if type(clustering_labels[0]) is not pd.np.ndarray:
-                predicted = pd.Series(index=self.data.index,
-                                      data=clustering_labels,
-                                      name="predicted")
-                aligned_labels = pd.concat([self.true_labels, predicted],
-                                           axis=1,
-                                           sort=False)
-                return clustering_labels, self._eval_clustering(
-                        aligned_labels.true,
-                        aligned_labels.predicted)
-            else:
-                # We have a list of predictions
-                res = defaultdict(list)
-                for c in range(0, len(clustering_labels)):
-                    predicted = pd.Series(index=self.data.index,
-                                          data=clustering_labels[c],
-                                          name="predicted")
-                    aligned_labels = pd.concat([self.true_labels, predicted],
-                                               axis=1,
-                                               sort=False)
-                    evals = self._eval_clustering(
-                            aligned_labels.true,
-                            aligned_labels.predicted)
-                    for k, v in evals.items():
-                        res[k].append(v)
-
-                # TODO: can the following be converted to a dict comprehension?
-                m_res = {}
-                for k, v in res.items():
-                    if None in v:
-                        m_res[k] = None
-                    else:
-                        m_res[k] = pd.np.mean(v)
-
-                # Return one sample clustering and the average expected scores
-                pred = clustering_labels[
-                        random.randint(0, len(clustering_labels)-1)]
-                return pred, m_res
-
+            predicted = pd.Series(index=self.data.index,
+                                  data=clustering_labels,
+                                  name="predicted")
+            aligned_labels = pd.concat([self.true_labels, predicted], axis=1,
+                                       sort=False)
         else:
             return None, None
+
+        return clustering_labels, self._eval_clustering(
+                aligned_labels.true,
+                aligned_labels.predicted)
 
     def eval_cluster_hdp(self):
         predicted = self._hdp_topic_clusters()

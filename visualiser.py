@@ -44,7 +44,7 @@ class Visualiser():
         self.double_square = double_square_size
         self.figs = {}
 
-    def show_values_on_bars(self, axs):
+    def show_values_on_bars(self, axs, size: int = 10):
         def _show_on_single_plot(ax):
             for p in ax.patches:
                 _x = p.get_x() + p.get_width() / 2
@@ -53,7 +53,7 @@ class Visualiser():
                 ax.text(_x, _y, value, ha="center",
                         fontdict={"color": "black",
                                   "weight": "bold",
-                                  "size": 10})
+                                  "size": size})
 
         if isinstance(axs, pd.np.ndarray):
             for idx, ax in pd.np.ndenumerate(axs):
@@ -107,13 +107,68 @@ class Visualiser():
         plt.show()
         plt.close()
 
-    def analyse_results(self,
-                        concise: bool,
-                        test_style: bool,
-                        sparse_path: str,
-                        neutral_path: str,
-                        dense_path: str,
-                        key_suff: str):
+    def plot_elaborate_gibbs_trace(self,
+                                   state_path: str,
+                                   key_suff: str):
+        df = pd.read_csv(
+                filepath_or_buffer=state_path,
+                delim_whitespace=True,
+                usecols=["iter", "time", "likelihood",
+                         "num.tables",  "num.topics"])
+        fig1, ax1 = plt.subplots(nrows=2,
+                                 ncols=1,
+                                 clear=True,
+                                 figsize=self.square)
+
+        fig2, ax2 = plt.subplots(nrows=2,
+                                 ncols=1,
+                                 clear=True,
+                                 figsize=self.square)
+
+        for a in ax1:
+            a.margins(x=0)
+
+        for a in ax2:
+            a.margins(x=0)
+
+        ax1[0].set_title("(a)")
+        sns.lineplot(ax=ax1[0],
+                     data=df,
+                     x="iter",
+                     y="num.topics")
+
+        ax1[1].set_title("(b)")
+        sns.lineplot(ax=ax1[1],
+                     data=df,
+                     x="iter",
+                     y="num.tables")
+
+        ax2[0].set_title("(c)")
+        sns.distplot(ax=ax2[0],
+                     a=df["num.topics"],
+                     bins=df["num.topics"].nunique(),
+                     kde=True,
+                     kde_kws={"bw": 1})
+
+        ax2[1].set_title("(d)")
+        sns.distplot(ax=ax2[1],
+                     a=df["num.tables"],
+                     bins=df["num.tables"].nunique(),
+                     kde=True,
+                     kde_kws={"bw": 1})
+        self.figs.update({f"Gibbs_Trace1_{key_suff}": fig1,
+                          f"Gibbs_Trace2_{key_suff}": fig2})
+        plt.tight_layout()
+        plt.show()
+        plt.close()
+
+    def analyse_results_compact(self,
+                                concise: bool,
+                                test_style: bool,
+                                sparse_path: str,
+                                neutral_path: str,
+                                dense_path: str,
+                                key_suff: str):
 
         df_neutral_res = pd.read_csv(neutral_path, low_memory=False)
         df_neutral_res = df_neutral_res[df_neutral_res.algorithm != "Labels"]
@@ -334,6 +389,221 @@ class Visualiser():
 
         return df_all
 
+    def analyse_results(self,
+                        concise: bool,
+                        test_style: bool,
+                        sparse_path: str,
+                        neutral_path: str,
+                        dense_path: str,
+                        key_suff: str):
+
+        df_neutral_res = pd.read_csv(neutral_path, low_memory=False)
+        df_neutral_res = df_neutral_res[df_neutral_res.algorithm != "Labels"]
+        df_sparse_res = pd.read_csv(sparse_path, low_memory=False)
+        df_sparse_res = df_sparse_res[df_sparse_res.algorithm != "Labels"]
+        df_dense_res = pd.read_csv(dense_path, low_memory=False)
+        df_dense_res = df_dense_res[df_dense_res.algorithm != "Labels"]
+
+        # Filter out redundant algorithms:
+        if concise:
+            df_neutral_res = df_neutral_res[
+                    ~df_neutral_res.algorithm.isin(
+                            ["E_HDBSCAN", "E_HAC_Single", "E_HAC_Average"])]
+            df_sparse_res = df_sparse_res[
+                    ~df_sparse_res.algorithm.isin(
+                            ["E_HDBSCAN", "E_HAC_Single", "E_HAC_Average"])]
+            df_dense_res = df_dense_res[
+                    ~df_dense_res.algorithm.isin(
+                            ["E_HDBSCAN", "E_HAC_Single", "E_HAC_Average"])]
+
+        if test_style:
+            df_all = df_sparse_res
+        else:
+            df_all = pd.concat(
+                    [df_neutral_res, df_sparse_res, df_dense_res],
+                    axis=0,
+                    keys=["Neutral", "Sparse", "Dense"]
+                    ).reset_index(level=0).rename(
+                            columns={"level_0": "topics_prior"})
+
+        algo_order = ["BL_r", "BL_s", "BL_SOTA_tf",
+                      "BL_SOTA_tfidf", "BL_SOTA_le",
+                      "S_HDP",
+                      "E_HAC_C", "E_Mean_Shift", "E_OPTICS", "E_SPKMeans"]
+
+        fig_overall_b3f, ax_overall_b3f = plt.subplots(nrows=1,
+                                                       ncols=1,
+                                                       clear=True,
+                                                       figsize=self.landscape)
+
+        fig_overall_ari, ax_overall_ari = plt.subplots(nrows=1,
+                                                       ncols=1,
+                                                       clear=True,
+                                                       figsize=self.landscape)
+        if test_style:
+            sns.barplot(x="algorithm", y="bcubed_fscore",
+                        data=df_all,
+                        # Use the simpler standard deviation instead of CI
+                        ci="sd",
+                        errwidth=self.error_width,
+                        capsize=self.error_cap_size,
+                        order=algo_order,
+                        ax=ax_overall_b3f)
+
+            sns.barplot(x="algorithm", y="ari",
+                        data=df_all,
+                        # Use the simpler standard deviation instead of CI
+                        ci="sd",
+                        errwidth=self.error_width,
+                        capsize=self.error_cap_size,
+                        order=algo_order,
+                        ax=ax_overall_ari)
+        else:
+            sns.barplot(x="algorithm", y="bcubed_fscore", hue="topics_prior",
+                        data=df_all,
+                        # Use the simpler standard deviation instead of CI
+                        ci="sd",
+                        errwidth=self.error_width,
+                        capsize=self.error_cap_size,
+                        order=algo_order,
+                        ax=ax_overall_b3f)
+
+            sns.barplot(x="algorithm", y="ari", hue="topics_prior",
+                        data=df_all,
+                        # Use the simpler standard deviation instead of CI
+                        ci="sd",
+                        errwidth=self.error_width,
+                        capsize=self.error_cap_size,
+                        order=algo_order,
+                        ax=ax_overall_ari)
+
+        if not test_style:
+            ax_overall_b3f.legend(loc="lower right")
+            ax_overall_ari.legend(loc="upper left")
+        else:
+            # Set the state-of-the-art bar:
+            ax_overall_b3f.axhline(0.573, ls='--')
+
+        # Rotate the x labels:
+        for ax1 in fig_overall_b3f.axes:
+            plt.sca(ax1)
+            ax1.set_xlabel("")
+            plt.xticks(rotation=90)
+        for ax2 in fig_overall_ari.axes:
+            plt.sca(ax2)
+            ax2.set_xlabel("")
+            plt.xticks(rotation=90)
+
+        # Show values on final test charts:
+        if test_style:
+            self.show_values_on_bars(ax_overall_b3f, size=22)
+            self.show_values_on_bars(ax_overall_ari, size=22)
+        plt.tight_layout()
+        plt.show()
+        plt.close()
+
+        fig_comb_genre_lang_en, ax_comb_genre_lang_en = plt.subplots(
+                nrows=2,
+                ncols=1,
+                clear=True,
+                figsize=self.portrait,
+                sharex="col")
+
+        fig_comb_genre_lang_nl, ax_comb_genre_lang_nl = plt.subplots(
+                nrows=2,
+                ncols=1,
+                clear=True,
+                figsize=self.portrait,
+                sharex="col")
+
+        fig_comb_genre_lang_gr, ax_comb_genre_lang_gr = plt.subplots(
+                nrows=2,
+                ncols=1,
+                clear=True,
+                figsize=self.portrait,
+                sharex="col")
+
+        sns.barplot(x="algorithm", y="bcubed_fscore", hue="genre",
+                    data=df_sparse_res[df_sparse_res.language == "en"],
+                    # Use the simpler standard deviation instead of CI
+                    ci="sd",
+                    errwidth=self.error_width,
+                    capsize=self.error_cap_size,
+                    order=algo_order,
+                    ax=ax_comb_genre_lang_en[0])
+        ax_comb_genre_lang_en[0].set_title("English")
+        sns.barplot(x="algorithm", y="bcubed_fscore", hue="genre",
+                    data=df_sparse_res[df_sparse_res.language == "nl"],
+                    # Use the simpler standard deviation instead of CI
+                    ci="sd",
+                    errwidth=self.error_width,
+                    capsize=self.error_cap_size,
+                    ax=ax_comb_genre_lang_nl[0])
+        ax_comb_genre_lang_nl[0].set_title("Dutch")
+        sns.barplot(x="algorithm", y="bcubed_fscore", hue="genre",
+                    data=df_sparse_res[df_sparse_res.language == "gr"],
+                    # Use the simpler standard deviation instead of CI
+                    ci="sd",
+                    errwidth=self.error_width,
+                    capsize=self.error_cap_size,
+                    order=algo_order,
+                    ax=ax_comb_genre_lang_gr[0])
+        ax_comb_genre_lang_gr[0].set_title("Greek")
+
+        sns.barplot(x="algorithm", y="ari", hue="genre",
+                    data=df_sparse_res[df_sparse_res.language == "en"],
+                    # Use the simpler standard deviation instead of CI
+                    ci="sd",
+                    errwidth=self.error_width,
+                    capsize=self.error_cap_size,
+                    order=algo_order,
+                    ax=ax_comb_genre_lang_en[1])
+        sns.barplot(x="algorithm", y="ari", hue="genre",
+                    data=df_sparse_res[df_sparse_res.language == "nl"],
+                    # Use the simpler standard deviation instead of CI
+                    ci="sd",
+                    errwidth=self.error_width,
+                    capsize=self.error_cap_size,
+                    order=algo_order,
+                    ax=ax_comb_genre_lang_nl[1])
+        sns.barplot(x="algorithm", y="ari", hue="genre",
+                    data=df_sparse_res[df_sparse_res.language == "gr"],
+                    # Use the simpler standard deviation instead of CI
+                    ci="sd",
+                    errwidth=self.error_width,
+                    capsize=self.error_cap_size,
+                    order=algo_order,
+                    ax=ax_comb_genre_lang_gr[1])
+
+        for ax1 in fig_comb_genre_lang_en.axes:
+            plt.sca(ax1)
+            ax1.set_xlabel("")
+            plt.xticks(rotation=90)
+        for ax2 in fig_comb_genre_lang_nl.axes:
+            plt.sca(ax2)
+            ax2.set_xlabel("")
+            plt.xticks(rotation=90)
+        for ax3 in fig_comb_genre_lang_gr.axes:
+            plt.sca(ax3)
+            ax3.set_xlabel("")
+            plt.xticks(rotation=90)
+        plt.legend(loc="lower right")
+        plt.tight_layout()
+        plt.show()
+        plt.close()
+
+        self.figs.update(
+                {f"Results_Overall_b3f_{key_suff}": fig_overall_ari,
+                 f"Results_Overall_ari_{key_suff}": fig_overall_b3f,
+                 f"Results_combined_genre_lang_en_{key_suff}":
+                     fig_comb_genre_lang_en,
+                 f"Results_combined_genre_lang_nl_{key_suff}":
+                     fig_comb_genre_lang_nl,
+                 f"Results_combined_genre_lang_gr_{key_suff}":
+                     fig_comb_genre_lang_gr})
+
+        return df_all
+
     def analyse_k_trends(self,
                          concise: bool,
                          k_vals_path: str,
@@ -343,9 +613,8 @@ class Visualiser():
                                  usecols=["Gap", "G-means", "E_SPKMeans",
                                           "E_HAC_C", "E_OPTICS",
                                           "TRUE"]
-                                 )[
-            ["Gap", "G-means", "E_SPKMeans",
-             "E_HAC_C", "E_OPTICS", "TRUE"]]
+                                 )[["Gap", "G-means", "E_SPKMeans",
+                                    "E_HAC_C", "E_OPTICS", "TRUE"]]
         else:
             k_vals = pd.read_csv(k_vals_path, low_memory=False, index_col=0)
 
@@ -535,8 +804,7 @@ class Visualiser():
             figure.savefig(fname=f"{out_dir}\\{fk}.{charts_format}",
                            dpi=dpi,
                            format=charts_format,
-                           transparent=False,  # EPS doesn't support it already
-                           metadata={"Author": "Rafi Trad"})
+                           transparent=False)
         # Clear the cache
         if flush:
             self.figs = None
@@ -583,7 +851,7 @@ if __name__ == "__main__":
 # =============================================================================
 
     # Analyse charts and construct the cached pool:
-    vis = Visualiser(scale=1.2)
+    vis = Visualiser(scale=1.33)
 
 # =============================================================================
 #     vis.analyse_results(concise=True,
@@ -615,23 +883,23 @@ if __name__ == "__main__":
     # Now the test data
     sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
               r"\authorship_clustering_code_repo\__outputs__\TESTS"
-              r"\results_20191008_223416_final_sparse.csv")
+              r"\results_20191011_005619_final_sparse.csv")
     dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
              r"\authorship_clustering_code_repo\__outputs__\TESTS"
-             r"\results_20191008_155035_final_dense.csv")
+             r"\results_20191028_204221_final_dense.csv")
     neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__\TESTS"
-               r"\results_20191008_154252_final_neutral.csv")
+               r"\results_20191028_201333_final_neutral.csv")
 
     k_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                 r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                r"\k_trend_20191008_161955_final_sparse.csv")
+                r"\k_trend_20191011_005619_final_sparse.csv")
     k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__\TESTS"
-               r"\k_trend_20191008_155035_final_dense.csv")
+               r"\k_trend_20191028_204221_final_dense.csv")
     k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                  r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                 r"\k_trend_20191008_154252_final_neutral.csv")
+                 r"\k_trend_20191028_201334_final_neutral.csv")
 
     trace_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
                     r"\pan17_test\problem015\lss_0.30_0.10_0.10_common_True"
@@ -645,13 +913,13 @@ if __name__ == "__main__":
 
     sparse_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                      r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                     r"\results_20191008_162823_final_trueK_sparse.csv")
+                     r"\results_20191011_005721_final_trueK_sparse.csv")
     dense_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                     r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                    r"\results_20191008_162544_final_trueK_dense.csv")
+                    r"\results_20191029_142920_final_trueK_dense.csv")
     neutral_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                       r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                      r"\results_20191008_162304_final_trueK_neutral.csv")
+                      r"\results_20191029_142810_final_trueK_neutral.csv")
 
     vis.visualise_cluster_sizes_hist(
             train_only=False,
@@ -696,6 +964,6 @@ if __name__ == "__main__":
             b3f_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
                       r"\Code\authorship_clustering_code_repo\__outputs__"
                       r"\TESTS\Friedman_Nemenyi_B3F_a_0.0500.csv"),
-                      a=0.05)
+            a=0.05)
     # Serialise the cached pool to disk
-#    vis.serialise_figs(charts_format="eps")
+    vis.serialise_figs(charts_format="eps")
