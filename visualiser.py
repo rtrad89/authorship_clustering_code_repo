@@ -21,7 +21,7 @@ class Visualiser():
     style_ticks = "ticks"
 
     def __init__(self,
-                 scale: float,
+                 rc: dict,
                  style: str = "darkgrid",
                  error_width: float = 1.0,
                  errorcap_size: float = 0.05,
@@ -30,9 +30,10 @@ class Visualiser():
                  portrait_size: tuple = (9, 15),
                  landscape_size: tuple = (15, 9),
                  rectangle_size: tuple = (15, 5),
-                 double_square_size: tuple = (15, 7.5)):
+                 double_square_size: tuple = (15, 7.5),
+                 large_square_size: tuple = (21, 21)):
         # Set seaborn defaults
-        sns.set(font_scale=scale)
+        sns.set(rc=rc)
         sns.set_style(style)
         self.error_width = error_width
         self.error_cap_size = errorcap_size
@@ -42,6 +43,7 @@ class Visualiser():
         self.landscape = landscape_size
         self.rectangle = rectangle_size
         self.double_square = double_square_size
+        self.large_square = large_square_size
         self.figs = {}
 
     def show_values_on_bars(self, axs, size: int = 10):
@@ -397,11 +399,20 @@ class Visualiser():
                         dense_path: str,
                         key_suff: str):
 
-        df_neutral_res = pd.read_csv(neutral_path, low_memory=False)
+        df_neutral_res = pd.read_csv(neutral_path, low_memory=False,
+                                     usecols=["set", "algorithm", "ari",
+                                              "bcubed_fscore", "language",
+                                              "genre"])
         df_neutral_res = df_neutral_res[df_neutral_res.algorithm != "Labels"]
-        df_sparse_res = pd.read_csv(sparse_path, low_memory=False)
+        df_sparse_res = pd.read_csv(sparse_path, low_memory=False,
+                                    usecols=["set", "algorithm", "ari",
+                                             "bcubed_fscore", "language",
+                                             "genre"])
         df_sparse_res = df_sparse_res[df_sparse_res.algorithm != "Labels"]
-        df_dense_res = pd.read_csv(dense_path, low_memory=False)
+        df_dense_res = pd.read_csv(dense_path, low_memory=False,
+                                   usecols=["set", "algorithm", "ari",
+                                            "bcubed_fscore", "language",
+                                            "genre"])
         df_dense_res = df_dense_res[df_dense_res.algorithm != "Labels"]
 
         # Filter out redundant algorithms:
@@ -431,6 +442,10 @@ class Visualiser():
                       "S_HDP",
                       "E_HAC_C", "E_Mean_Shift", "E_OPTICS", "E_SPKMeans"]
 
+        colours = ["#fafafc", "#fafafc",
+                   "#84d674", "#84d674", "#84d674",
+                   "#f3f571",
+                   "#3c6cf0", "#3c6cf0", "#3c6cf0", "#3c6cf0"]
         fig_overall_b3f, ax_overall_b3f = plt.subplots(nrows=1,
                                                        ncols=1,
                                                        clear=True,
@@ -448,7 +463,9 @@ class Visualiser():
                         errwidth=self.error_width,
                         capsize=self.error_cap_size,
                         order=algo_order,
-                        ax=ax_overall_b3f)
+                        ax=ax_overall_b3f,
+                        palette=colours,
+                        edgecolor=".2")
 
             sns.barplot(x="algorithm", y="ari",
                         data=df_all,
@@ -457,7 +474,9 @@ class Visualiser():
                         errwidth=self.error_width,
                         capsize=self.error_cap_size,
                         order=algo_order,
-                        ax=ax_overall_ari)
+                        ax=ax_overall_ari,
+                        palette=colours,
+                        edgecolor=".2")
         else:
             sns.barplot(x="algorithm", y="bcubed_fscore", hue="topics_prior",
                         data=df_all,
@@ -466,7 +485,9 @@ class Visualiser():
                         errwidth=self.error_width,
                         capsize=self.error_cap_size,
                         order=algo_order,
-                        ax=ax_overall_b3f)
+                        ax=ax_overall_b3f,
+                        palette=colours,
+                        edgecolor=".2")
 
             sns.barplot(x="algorithm", y="ari", hue="topics_prior",
                         data=df_all,
@@ -475,7 +496,9 @@ class Visualiser():
                         errwidth=self.error_width,
                         capsize=self.error_cap_size,
                         order=algo_order,
-                        ax=ax_overall_ari)
+                        ax=ax_overall_ari,
+                        palette=colours,
+                        edgecolor=".2")
 
         if not test_style:
             ax_overall_b3f.legend(loc="lower right")
@@ -538,6 +561,7 @@ class Visualiser():
                     ci="sd",
                     errwidth=self.error_width,
                     capsize=self.error_cap_size,
+                    order=algo_order,
                     ax=ax_comb_genre_lang_nl[0])
         ax_comb_genre_lang_nl[0].set_title("Dutch")
         sns.barplot(x="algorithm", y="bcubed_fscore", hue="genre",
@@ -593,8 +617,8 @@ class Visualiser():
         plt.close()
 
         self.figs.update(
-                {f"Results_Overall_b3f_{key_suff}": fig_overall_ari,
-                 f"Results_Overall_ari_{key_suff}": fig_overall_b3f,
+                {f"Results_Overall_ari_{key_suff}": fig_overall_ari,
+                 f"Results_Overall_b3f_{key_suff}": fig_overall_b3f,
                  f"Results_combined_genre_lang_en_{key_suff}":
                      fig_comb_genre_lang_en,
                  f"Results_combined_genre_lang_nl_{key_suff}":
@@ -602,6 +626,65 @@ class Visualiser():
                  f"Results_combined_genre_lang_gr_{key_suff}":
                      fig_comb_genre_lang_gr})
 
+        return df_all
+
+    def analyse_true_k_results(self,
+                               true_path: str,
+                               est_path: str,
+                               key_suff: str):
+        # Read the data
+        df_est = pd.read_csv(est_path,
+                             usecols=["set", "algorithm", "ari",
+                                      "bcubed_fscore"],
+                             low_memory=False)
+        df_est = df_est[df_est.algorithm != "Labels"]
+        df_est = df_est[
+                df_est.algorithm.isin(
+                        ["E_HAC_C", "E_SPKMeans"])]
+
+        df_true = pd.read_csv(true_path,
+                              usecols=["set", "algorithm", "ari",
+                                       "bcubed_fscore"],
+                              low_memory=False)
+        df_true = df_true[df_true.algorithm != "Labels"]
+        df_true = df_true[
+                df_true.algorithm.isin(
+                        ["E_HAC_C", "E_SPKMeans"])]
+
+        # Merge the two dataframes
+        df_all = df_est.merge(df_true, on=["set", "algorithm"],
+                              suffixes=("_est", "_true"))
+
+        # Group the results and plot them
+        df_all = df_all.groupby(by=["algorithm"]).mean()
+        df_all = df_all.sort_index(axis=1).T
+        df_all = df_all.reset_index(
+                ).rename(columns={"index": "measurement"}
+                         ).melt(id_vars="measurement")
+
+        fig, ax = plt.subplots(nrows=1,
+                               ncols=1,
+                               clear=True,
+                               figsize=self.square)
+
+        sns.catplot(data=df_all, x="algorithm", y="value", hue="measurement",
+                    ax=ax, kind="bar")
+        # Rotate the axes 90 degrees
+        for a in fig.axes:
+            plt.sca(a)
+            a.set_xlabel("")
+            plt.xticks(rotation=90)
+        # Annotate the bars
+        self.show_values_on_bars(ax, size=18)
+        # Output the chart
+        plt.legend(loc="upper left", bbox_to_anchor=(0, 0.8))
+        plt.tight_layout()
+        plt.show()
+        plt.close()
+
+        # Save the figure in the cache for later serialisation
+        self.figs.update(
+                {f"Results_true_k_improvement": fig})
         return df_all
 
     def analyse_k_trends(self,
@@ -686,15 +769,22 @@ class Visualiser():
         df_rmse = pd.DataFrame(data=rmse, index=[0]).T
         df_rmse.columns = ["RMSE"]
 
-        fig_rmse, ax_rmse = plt.subplots(clear=True, figsize=self.single)
+        fig_rmse, ax_rmse = plt.subplots(clear=True, figsize=self.square)
         sns.barplot(x=df_rmse.index, y="RMSE", data=df_rmse, ci="sd",
-                    ax=ax_rmse)
+                    ax=ax_rmse,
+                    order=["BL_SOTA_tf", "BL_SOTA_tfidf", "BL_SOTA_le",
+                           "Gap", "G-means",
+                           "E_HAC_C", "E_OPTICS", "E_SPKMeans"],
+                    palette=["#84d674", "#84d674", "#84d674",
+                             "#fafafc", "#fafafc",
+                             "#3c6cf0", "#3c6cf0", "#3c6cf0"],
+                    edgecolor=".2")
 
         # Rotate the x axes
         for ax in fig_rmse.axes:
             plt.sca(ax)
             plt.xticks(rotation=90)
-        self.show_values_on_bars(ax_rmse)
+        self.show_values_on_bars(ax_rmse, size=21)
         plt.tight_layout()
         plt.show()
         plt.close()
@@ -722,7 +812,7 @@ class Visualiser():
 
         hist_data = pd.Series(freq, name="Clusters Sizes").value_counts()
 
-        fig, ax = plt.subplots(clear=True, figsize=self.single)
+        fig, ax = plt.subplots(clear=True, figsize=self.square)
 
         sns.barplot(x=hist_data.index, y=hist_data.values,
                     ci="sd", color="black", ax=ax)
@@ -746,7 +836,7 @@ class Visualiser():
                                                    ncols=1,
                                                    clear=True,
                                                    sharey="row",
-                                                   figsize=self.square)
+                                                   figsize=self.large_square)
             sns.heatmap((abs(df_b3f)), annot=True, center=a,
                         cbar=False, linewidths=0.5, fmt="0.3f", square=True,
                         cmap=ListedColormap(["#68b025", "#dadce0"]),
@@ -761,7 +851,7 @@ class Visualiser():
                                                    ncols=2,
                                                    clear=True,
                                                    sharey="row",
-                                                   figsize=self.double_square)
+                                                   figsize=self.large_square)
 
             sns.heatmap((abs(df_b3f)), annot=True, center=a,
                         cbar=False, linewidths=0.5, fmt="0.3f", square=True,
@@ -804,7 +894,8 @@ class Visualiser():
             figure.savefig(fname=f"{out_dir}\\{fk}.{charts_format}",
                            dpi=dpi,
                            format=charts_format,
-                           transparent=False)
+                           transparent=False,
+                           bbox_inches="tight")
         # Clear the cache
         if flush:
             self.figs = None
@@ -851,7 +942,10 @@ if __name__ == "__main__":
 # =============================================================================
 
     # Analyse charts and construct the cached pool:
-    vis = Visualiser(scale=1.33)
+    params = {"font.size": 21, "axes.labelsize": 21, "legend.fontsize": 16.0,
+              "axes.titlesize": 21,
+              "xtick.labelsize": 24, "ytick.labelsize": 21}
+    vis = Visualiser(rc=params)
 
 # =============================================================================
 #     vis.analyse_results(concise=True,
@@ -883,7 +977,7 @@ if __name__ == "__main__":
     # Now the test data
     sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
               r"\authorship_clustering_code_repo\__outputs__\TESTS"
-              r"\results_20191011_005619_final_sparse.csv")
+              r"\results_20191011_040654_final_sparse.csv")
     dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
              r"\authorship_clustering_code_repo\__outputs__\TESTS"
              r"\results_20191028_204221_final_dense.csv")
@@ -893,7 +987,7 @@ if __name__ == "__main__":
 
     k_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                 r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                r"\k_trend_20191011_005619_final_sparse.csv")
+                r"\k_trend_20191011_040654_final_sparse.csv")
     k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                r"\authorship_clustering_code_repo\__outputs__\TESTS"
                r"\k_trend_20191028_204221_final_dense.csv")
@@ -913,7 +1007,7 @@ if __name__ == "__main__":
 
     sparse_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                      r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                     r"\results_20191011_005721_final_trueK_sparse.csv")
+                     r"\results_20191011_040752_final_trueK_sparse.csv")
     dense_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
                     r"\authorship_clustering_code_repo\__outputs__\TESTS"
                     r"\results_20191029_142920_final_trueK_dense.csv")
@@ -942,28 +1036,26 @@ if __name__ == "__main__":
     vis.plot_gibbs_trace(state_path=trace_sparse,
                          key_suff="_sparse")
 
-    vis.analyse_k_trends(concise=True,
-                         k_vals_path=k_dense,
-                         key_suff="_dense")
-    vis.plot_gibbs_trace(state_path=trace_dense,
-                         key_suff="_dense")
+#    vis.analyse_k_trends(concise=True,
+#                         k_vals_path=k_dense,
+#                         key_suff="_dense")
+#    vis.plot_gibbs_trace(state_path=trace_dense,
+#                         key_suff="_dense")
+#
+#    vis.analyse_k_trends(concise=True,
+#                         k_vals_path=k_neutral,
+#                         key_suff="_neutral")
+#    vis.plot_gibbs_trace(state_path=trace_neutral,
+#                         key_suff="_neutral")
 
-    vis.analyse_k_trends(concise=True,
-                         k_vals_path=k_neutral,
-                         key_suff="_neutral")
-    vis.plot_gibbs_trace(state_path=trace_neutral,
-                         key_suff="_neutral")
+    vis.analyse_true_k_results(true_path=sparse_true_k,
+                               est_path=sparse,
+                               key_suff="_true_k")
 
-    vis.analyse_results(concise=True,
-                        test_style=True,
-                        sparse_path=sparse_true_k,
-                        dense_path=dense_true_k,
-                        neutral_path=neutral_true_k,
-                        key_suff="_true_k")
-    vis.visualise_nemenyi_post_hoc(
-            b3f_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
-                      r"\Code\authorship_clustering_code_repo\__outputs__"
-                      r"\TESTS\Friedman_Nemenyi_B3F_a_0.0500.csv"),
-            a=0.05)
+#    vis.visualise_nemenyi_post_hoc(
+#            b3f_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
+#                      r"\Code\authorship_clustering_code_repo\__outputs__"
+#                      r"\TESTS\Friedman_Nemenyi_B3F_a_0.0500.csv"),
+#            a=0.05)
     # Serialise the cached pool to disk
     vis.serialise_figs(charts_format="eps")
