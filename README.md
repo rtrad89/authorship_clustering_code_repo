@@ -1,3 +1,5 @@
 # Authorial Clustering of Short Texts With Non-parametric Topic Models
 
-Still in progress.. expected to complete in 2019.
+The digital age has engulfed us in data of various types, but not all of data are innocuous. Adverse data can be detrimental to individuals and nations alike and thus require serious intervention. In that regard, authenticating data and ascribing them to their producers can consequently aid in marginalising harmful data and advancing digital forensics. In the context of textual data, topic modelling proved useful in one authorship analysis task, namely authorship verification, and this study is the first to assess the feasibility of topic modelling towards the related authorial clustering task.
+
+We propose a language-independent approach to perform authorial clustering on short texts. The aforesaid approach utilises non-parametric topic models with a straightforward term weighting scheme to infer a low-dimensional less-noisy latent semantic space representation of texts (LSSR) which enables some traditional clustering algorithms to work more effectively. A simple and an elaborate workflow are assessed in light of naive and state-of-the-art baselines, using 120 authorial clustering problems which span three languages and two genres.
