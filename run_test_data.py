@@ -11,6 +11,7 @@ from typing import List, Dict
 import warnings
 
 warnings.filterwarnings(action="ignore")  # Supress warning for this code file
+train_phase = False
 
 
 class TestApproach:

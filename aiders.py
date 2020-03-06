@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import normalize
 from scipy.stats import friedmanchisquare
 from scikit_posthocs import posthoc_nemenyi_friedman
-from random import seed, sample
 
 
 class Tools:
@@ -368,34 +367,6 @@ class Tools:
             times.append(df.iloc[-1, 0])
 
         return pd.Series(times).describe()
-
-    @staticmethod
-    def elicit_constraints(truth: pd.Series,
-                           prct: float = 0.05):
-        """
-        Generate ML and NL constraints from the ground truth for COP KMeans
-        """
-        n = len(truth)
-        links_space_size = .5 * n * (n-1)
-        required_links = round(prct * links_space_size)
-        pairs = set()
-        seed(13712)
-        while (len(pairs) < required_links):
-            linking_docs = tuple(sample(range(0, len(truth)), 2))
-            # Avoid the other permutation of the same link
-            i_linking_docs = (linking_docs[1], linking_docs[0])
-            if i_linking_docs not in pairs:
-                pairs.add(linking_docs)
-        # Build the must-link and cannot-link sets
-        must_link, cannot_link = [], []
-        for p in pairs:
-            d1, d2 = p
-            must_be_linked = (truth[[d1, d2]].nunique() == 1)
-            if must_be_linked:
-                must_link.append(p)
-            else:
-                cannot_link.append(p)
-        return must_link, cannot_link, pairs
 
 
 def main():

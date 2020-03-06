@@ -27,7 +27,7 @@ from gap_statistic import OptimalK
 from gmeans import GMeans
 import random
 from collections import defaultdict
-
+from cop_kmeans import cop_kmeans
 
 class Clusterer:
     # Define algorithms options for external usage
@@ -40,6 +40,7 @@ class Clusterer:
     alg_optics = 7
     bl_random = 8
     bl_singleton = 9
+    alg_cop_kmeans = 10
 
     def __init__(self,
                  dtm: List[List],
@@ -382,6 +383,45 @@ class Clusterer:
             self.cand_k.append(1+max(pred))
         return pred
 
+    def _cluster_cop_kmeans(self,
+                            constraints_size: float = 0.05):
+        truth = self.true_labels.sort_index()
+
+        def elicit_constraints(truth: pd.Series,
+                               prct: float = 0.05):
+            """
+            Generate ML and NL constraints from the ground truth for COPKMeans
+            """
+            n = len(truth)
+            links_space_size = .5 * n * (n-1)
+            required_links = round(prct * links_space_size)
+            pairs = set()
+            random.seed(13712)
+            while (len(pairs) < required_links):
+                linking_docs = tuple(random.sample(range(0, len(truth)), 2))
+                # Avoid the other permutation of the same link
+                i_linking_docs = (linking_docs[1], linking_docs[0])
+                if i_linking_docs not in pairs:
+                    pairs.add(linking_docs)
+            # Build the must-link and cannot-link sets
+            must_link, cannot_link = [], []
+            for p in pairs:
+                d1, d2 = p
+                must_be_linked = (truth[[d1, d2]].nunique() == 1)
+                if must_be_linked:
+                    must_link.append(p)
+                else:
+                    cannot_link.append(p)
+            return must_link, cannot_link, pairs
+
+        must_l, cant_l, _ = elicit_constraints(truth=truth,
+                                               prct=constraints_size)
+        pred, _ = cop_kmeans(dataset=self.data,
+                             k=self.k,
+                             ml=must_l,
+                             cl=cant_l)
+        return pred
+
     def _bl_random(self):
         rand_k = random.randint(1, len(self.data) + 1)
         # Assign doucments on random
@@ -480,7 +520,8 @@ class Clusterer:
     def evaluate(self,
                  alg_option: int,
                  param_linkage: str = None,
-                 param_init: str = None):
+                 param_init: str = None,
+                 param_constraints_size: float):
 
         if alg_option == Clusterer.alg_h_dbscan:
             clustering_labels = self._cluster_hdbscan()
@@ -506,6 +547,10 @@ class Clusterer:
 
         elif alg_option == Clusterer.alg_x_means:
             clustering_labels = self._cluster_xmeans()
+
+        elif alg_option == Clusterer.alg_cop_kmeans:
+            clustering_labels = self._cluster_cop_kmeans(
+                    constraints_size=param_constraints_size)
 
         elif alg_option == Clusterer.bl_random:
             clustering_labels = self._bl_random()
