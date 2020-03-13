@@ -11,7 +11,8 @@ from typing import List, Dict
 import warnings
 
 warnings.filterwarnings(action="ignore")  # Supress warning for this code file
-train_phase = False
+train_phase = True
+include_older_algorithms = True  # False is suitable to test new algorithms
 
 
 class TestApproach:
@@ -47,7 +48,7 @@ class TestApproach:
                 hdp_path=self.hdp_path,
                 input_docs_path=input_ps,
                 ldac_filename=r"ldac_corpus",
-                hdp_output_dir=r"lss",
+                hdp_output_dir=r"lss" if not train_phase else r"hdp_lss",
                 hdp_iters=self.gibbs_iterations,
                 hdp_eta=hdp_eta,
                 hdp_gamma_s=hdp_gamma_s,
@@ -81,34 +82,40 @@ class TestApproach:
                             metric="cosine",
                             desired_n_clusters=desired_k)
 
-        # Run SPKMeans 10 times to get mean performance
-        norm_spk_pred, norm_spk_evals = clu_lss.evaluate(
-                alg_option=Clusterer.alg_spherical_k_means,
-                param_init="k-means++")
+        if include_older_algorithms:
+            # Run SPKMeans 10 times to get mean performance
+            norm_spk_pred, norm_spk_evals = clu_lss.evaluate(
+                    alg_option=Clusterer.alg_spherical_k_means,
+                    param_init="k-means++")
 
-        norm_hdbscan_pred, norm_hdbscan_evals = clu_lss.evaluate(
-                alg_option=Clusterer.alg_h_dbscan)
+            norm_hdbscan_pred, norm_hdbscan_evals = clu_lss.evaluate(
+                    alg_option=Clusterer.alg_h_dbscan)
 
-        norm_ms_pred, norm_ms_evals = clu_lss.evaluate(
-                alg_option=Clusterer.alg_mean_shift)
+            norm_ms_pred, norm_ms_evals = clu_lss.evaluate(
+                    alg_option=Clusterer.alg_mean_shift)
 
-#        norm_xm_pred, norm_xm_evals = clu_lss.evaluate(
-#                alg_option=Clusterer.alg_x_means)
+    #        norm_xm_pred, norm_xm_evals = clu_lss.evaluate(
+    #                alg_option=Clusterer.alg_x_means)
 
-        nhac_complete_pred, nhac_complete_evals = clu_lss.evaluate(
-                alg_option=Clusterer.alg_hac,
-                param_linkage="complete")
+            nhac_complete_pred, nhac_complete_evals = clu_lss.evaluate(
+                    alg_option=Clusterer.alg_hac,
+                    param_linkage="complete")
 
-        nhac_s_pred, nhac_s_evals = clu_lss.evaluate(
-                alg_option=Clusterer.alg_hac,
-                param_linkage="single")
+            nhac_s_pred, nhac_s_evals = clu_lss.evaluate(
+                    alg_option=Clusterer.alg_hac,
+                    param_linkage="single")
 
-        nhac_a_pred, nhac_a_evals = clu_lss.evaluate(
-                alg_option=Clusterer.alg_hac,
-                param_linkage="average")
+            nhac_a_pred, nhac_a_evals = clu_lss.evaluate(
+                    alg_option=Clusterer.alg_hac,
+                    param_linkage="average")
 
-        n_optics_pred, n_optics_evals = clu_lss.evaluate(
-                alg_option=Clusterer.alg_optics)
+            n_optics_pred, n_optics_evals = clu_lss.evaluate(
+                    alg_option=Clusterer.alg_optics)
+
+        cop_kmeans_pred, cop_kmeans_evals = clu_lss.evaluate(
+            alg_option=Clusterer.alg_cop_kmeans,
+            param_constraints_size=0.08,
+            param_copkmeans_init="random")
 
         # Baselines
         bl_rand_pred, bl_rand_evals = clu_lss.evaluate(
@@ -120,29 +127,54 @@ class TestApproach:
         ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
 
         # SOTA - Gomez et. al. HAC and Log-Entropy with 20k features
-        sota_pred_path_le = (r"D:\College\DKEM\Thesis\AuthorshipClustering"
-                             r"\Code\clusterPAN2017-master\output_LogEnt"
-                             f"\\problem{ps:03d}\\clustering.json")
-        sota_predicted_le = Tools.load_true_clusters_into_vector(
-                sota_pred_path_le)
-        sota_pred_le, sota_evals_le = clu_lss.eval_sota(
-                sota_predicted=sota_predicted_le)
+        # Not Applicable for Training data
+        if not train_phase:
+            sota_pred_path_le = (r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                                 r"\Code\clusterPAN2017-master\output_LogEnt"
+                                 f"\\problem{ps:03d}\\clustering.json")
+            sota_predicted_le = Tools.load_true_clusters_into_vector(
+                    sota_pred_path_le)
+            sota_pred_le, sota_evals_le = clu_lss.eval_sota(
+                    sota_predicted=sota_predicted_le)
 
-        sota_pred_path_tf = (r"D:\College\DKEM\Thesis\AuthorshipClustering"
-                             r"\Code\clusterPAN2017-master\output_Tf"
-                             f"\\problem{ps:03d}\\clustering.json")
-        sota_predicted_tf = Tools.load_true_clusters_into_vector(
-                sota_pred_path_tf)
-        sota_pred_tf, sota_evals_tf = clu_lss.eval_sota(
-                sota_predicted=sota_predicted_tf)
+            sota_pred_path_tf = (r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                                 r"\Code\clusterPAN2017-master\output_Tf"
+                                 f"\\problem{ps:03d}\\clustering.json")
+            sota_predicted_tf = Tools.load_true_clusters_into_vector(
+                    sota_pred_path_tf)
+            sota_pred_tf, sota_evals_tf = clu_lss.eval_sota(
+                    sota_predicted=sota_predicted_tf)
 
-        sota_pred_path_tfidf = (r"D:\College\DKEM\Thesis\AuthorshipClustering"
-                                r"\Code\clusterPAN2017-master\output_TfIdf"
-                                f"\\problem{ps:03d}\\clustering.json")
-        sota_predicted_tfidf = Tools.load_true_clusters_into_vector(
-                sota_pred_path_tfidf)
-        sota_pred_tfidf, sota_evals_tfidf = clu_lss.eval_sota(
-                sota_predicted=sota_predicted_tfidf)
+            sota_pred_path_tfidf = (
+                r"D:\College\DKEM\Thesis\AuthorshipClustering"
+                r"\Code\clusterPAN2017-master\output_TfIdf"
+                f"\\problem{ps:03d}\\clustering.json")
+            sota_predicted_tfidf = Tools.load_true_clusters_into_vector(
+                    sota_pred_path_tfidf)
+            sota_pred_tfidf, sota_evals_tfidf = clu_lss.eval_sota(
+                    sota_predicted=sota_predicted_tfidf)
+        else:
+            # Build some placeholders only as SOTA isn't required to train
+            # sota_pred_le = [0] * len(data)
+            # sota_pred_tf = [0] * len(data)
+            # sota_pred_tfidf = [0] * len(data)
+            placebo_ret = {}
+            placebo_ret.update({"nmi": None,
+                                "ami": None,
+                                "ari": None,
+                                "fms": None,
+                                "v_measure": None,
+                                "bcubed_precision": None,
+                                "bcubed_recall": None,
+                                "bcubed_fscore": None,
+                                "Silhouette": None,
+                                "Calinski_harabasz": None,
+                                "Davies_Bouldin": None
+                                # Here goes the unsupervised indices
+                                })
+            sota_evals_le = placebo_ret
+            sota_evals_tf = placebo_ret
+            sota_evals_tfidf = placebo_ret
 
         # Control whether k is estimated or it is the true k replicated:
         if desired_k != 0:
@@ -157,7 +189,8 @@ class TestApproach:
                         norm_spk_evals, norm_hdbscan_evals,
                         norm_ms_evals,  # norm_xm_evals,
                         nhac_complete_evals, nhac_s_evals, nhac_a_evals,
-                        n_optics_evals, bl_rand_evals, bl_singleton_evals,
+                        n_optics_evals, cop_kmeans_evals,
+                        bl_rand_evals, bl_singleton_evals,
                         nhdp_evals,
                         sota_evals_tf, sota_evals_tfidf, sota_evals_le,
                         ntrue_evals
@@ -166,7 +199,8 @@ class TestApproach:
                              "E_SPKMeans", "E_HDBSCAN",
                              "E_Mean_Shift",  # "XMeans",
                              "E_HAC_C", "E_HAC_Single", "E_HAC_Average",
-                             "E_OPTICS", "BL_r", "BL_s", "S_HDP",
+                             "E_OPTICS", "E_COP_KMeans",
+                             "BL_r", "BL_s", "S_HDP",
                              "BL_SOTA_tf", "BL_SOTA_tfidf", "BL_SOTA_le",
                              "Labels"],
                 problem_set=ps)
@@ -183,9 +217,10 @@ class TestApproach:
                 results,
                 metadata_fpath=info_path,
                 suffix=suffix,
-                test_data=True)
+                test_data=not train_phase)
 
-        Tools.save_k_vals_as_df(k_vals=k_values, suffix=suffix, test_data=True)
+        Tools.save_k_vals_as_df(k_vals=k_values, suffix=suffix,
+                                test_data=not train_phase)
 
         return path
 
@@ -213,7 +248,9 @@ class TestApproach:
 
         problemsets_results = []
         k_vals = []
-        for ps in range(1, 121):
+        # Detect if we're dealing with the train or test data
+        r = range(1, 121) if not train_phase else range(1, 61)
+        for ps in r:
             print(f"\nVectorising problem set ► {ps:03d} ◄ ..")
             plain_docs, bow_rep_docs, lss_rep_docs = tester._vectorise_ps(
                     ps,
@@ -262,14 +299,17 @@ if __name__ == "__main__":
 #                     save_name_suff="_final",
 #                     infer=False,
 #                     desired_k=None)
-#     print("========== SPARSE ==========")
-#     sparse = tester.run_test(
-#             configuration=TestApproach.config_sparse,
-#             drop_uncommon=True,
-#             save_name_suff="_final",
-#             infer=False,
-#             desired_k=None)
-#
+# =============================================================================
+
+    print("========== SPARSE ==========")
+    sparse = tester.run_test(
+            configuration=TestApproach.config_sparse,
+            drop_uncommon=True,
+            save_name_suff="_final",
+            infer=False,
+            desired_k=None)
+
+# =============================================================================
 #     # Run Friedman-Nemenyi test with Bonferroni correction for multiple tests
 #     # since the dataset is the same if ARI is included
 #     print(Tools.friedman_nemenyi_bonferroni_tests(
@@ -278,23 +318,26 @@ if __name__ == "__main__":
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬Using True K ▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
-    print("========== NEUTRAL-K ==========")
-    tester.run_test(configuration=TestApproach.config_neutral,
-                    drop_uncommon=True,
-                    save_name_suff="_final_trueK",
-                    infer=False,
-                    desired_k=0)
-    print("========== DENSE-K ==========")
-    tester.run_test(configuration=TestApproach.config_dense,
-                    drop_uncommon=True,
-                    save_name_suff="_final_trueK",
-                    infer=False,
-                    desired_k=0)
-    print("========== SPARSE-K ==========")
-    tester.run_test(configuration=TestApproach.config_sparse,
-                    drop_uncommon=True,
-                    save_name_suff="_final_trueK",
-                    infer=False,
-                    desired_k=0)
+# =============================================================================
+#     print("========== NEUTRAL-K ==========")
+#     tester.run_test(configuration=TestApproach.config_neutral,
+#                     drop_uncommon=True,
+#                     save_name_suff="_final_trueK",
+#                     infer=False,
+#                     desired_k=0)
+#     print("========== DENSE-K ==========")
+#     tester.run_test(configuration=TestApproach.config_dense,
+#                     drop_uncommon=True,
+#                     save_name_suff="_final_trueK",
+#                     infer=False,
+#                     desired_k=0)
+# =============================================================================
+
+    # print("========== SPARSE-K ==========")
+    # tester.run_test(configuration=TestApproach.config_sparse,
+    #                 drop_uncommon=True,
+    #                 save_name_suff="_final_trueK",
+    #                 infer=False,
+    #                 desired_k=0)
 
     print("\n▬▬▬▬▬▬▬▬▬▬▬▬(FINISHED)▬▬▬▬▬▬▬▬▬▬▬")

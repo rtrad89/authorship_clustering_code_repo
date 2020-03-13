@@ -28,6 +28,8 @@ from gmeans import GMeans
 import random
 from collections import defaultdict
 from cop_kmeans import cop_kmeans
+from sys import exit
+
 
 class Clusterer:
     # Define algorithms options for external usage
@@ -86,7 +88,7 @@ class Clusterer:
                 self.estimated_k = True
         else:
             print("\nERROR: cannot create class.\n"
-                  "Data must be passed as a dataframe or similar structure.\n")
+                  "Data must be passed as a dataframe or the likes.\n")
 
     def _estimate_k(self, include_bic: bool, include_gap: bool):
         """
@@ -217,6 +219,7 @@ class Clusterer:
         to textual high dimentional data. Since it exploits randomness in
         initialisations and estimations of k, we avergare over 10 runs to
         increase the reliability and reproducibility of results.
+        Attention: This routine also estimates k and stores it in the Clusterer
 
         Returns
         -------
@@ -239,6 +242,9 @@ class Clusterer:
             # Append the average of candidate k over runs
             self.cand_k = list(pd.np.mean(cands, axis=0))
             self.k = round(self.cand_k[0])
+            # Because round(np.float) is float not int, we need to coerce int:
+            if type(self.k) is not int:
+                self.k = int(self.k)
         else:
             for rc in range(0, runs):
                 skm = SphericalKMeans(n_clusters=self.k, init=init,
@@ -384,7 +390,15 @@ class Clusterer:
         return pred
 
     def _cluster_cop_kmeans(self,
-                            constraints_size: float = 0.05):
+                            constraints_size: float = 0.05,
+                            initialisation: str = "random"):
+        """
+        For KMeans++ initialisation, "kmpp" is to be used instead of random.
+        """
+        # 2DO: fix the ZeroDivisionError when using kmpp due to the
+        # infinitisimal values of chances array. This can make better early
+        # decisions and hence may prevent a failure with some constraint sets
+
         truth = self.true_labels.sort_index()
 
         def elicit_constraints(truth: pd.Series,
@@ -416,10 +430,11 @@ class Clusterer:
 
         must_l, cant_l, _ = elicit_constraints(truth=truth,
                                                prct=constraints_size)
-        pred, _ = cop_kmeans(dataset=self.data,
+        pred, _ = cop_kmeans(dataset=self.data.to_numpy(),
                              k=self.k,
                              ml=must_l,
-                             cl=cant_l)
+                             cl=cant_l,
+                             initialization=initialisation)
         return pred
 
     def _bl_random(self):
@@ -521,7 +536,8 @@ class Clusterer:
                  alg_option: int,
                  param_linkage: str = None,
                  param_init: str = None,
-                 param_constraints_size: float):
+                 param_constraints_size: float = 0.05,
+                 param_copkmeans_init: str = "random"):
 
         if alg_option == Clusterer.alg_h_dbscan:
             clustering_labels = self._cluster_hdbscan()
@@ -550,7 +566,8 @@ class Clusterer:
 
         elif alg_option == Clusterer.alg_cop_kmeans:
             clustering_labels = self._cluster_cop_kmeans(
-                    constraints_size=param_constraints_size)
+                    constraints_size=param_constraints_size,
+                    initialisation=param_copkmeans_init)
 
         elif alg_option == Clusterer.bl_random:
             clustering_labels = self._bl_random()

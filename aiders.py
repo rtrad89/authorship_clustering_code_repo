@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import normalize
 from scipy.stats import friedmanchisquare
 from scikit_posthocs import posthoc_nemenyi_friedman
+from sys import exit
 
 
 class Tools:
