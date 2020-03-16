@@ -232,8 +232,11 @@ class Tools:
         return s, fit
 
     @staticmethod
-    def save_list_to_text(mylist: list, filepath: str):
+    def save_list_to_text(mylist: list, filepath: str,
+                          header: str = None):
         with open(filepath, 'w') as file_handler:
+            if header:
+                file_handler.write(f"{header}\n{'-'*12}\n")
             for item in mylist:
                 file_handler.write(f"{item}\n")
 

@@ -14,6 +14,9 @@ warnings.filterwarnings(action="ignore")  # Supress warning for this code file
 train_phase = True
 include_older_algorithms = True  # False is suitable to test new algorithms
 
+# Controlling variable for CBC
+constraints_fraction = 0.12
+
 
 class TestApproach:
     # Sampling preference
@@ -82,12 +85,19 @@ class TestApproach:
                             metric="cosine",
                             desired_n_clusters=desired_k)
 
-        if include_older_algorithms:
-            # Run SPKMeans 10 times to get mean performance
-            norm_spk_pred, norm_spk_evals = clu_lss.evaluate(
-                    alg_option=Clusterer.alg_spherical_k_means,
-                    param_init="k-means++")
+        # Run SPKMeans 10 times to get mean performance
+        # This is also what supplied the estimated k for the Clusterer
+        # TODO: decouple k estimations from the evaluation
+        norm_spk_pred, norm_spk_evals = clu_lss.evaluate(
+                alg_option=Clusterer.alg_spherical_k_means,
+                param_init="k-means++")
 
+        cop_kmeans_pred, cop_kmeans_evals = clu_lss.evaluate(
+            alg_option=Clusterer.alg_cop_kmeans,
+            param_constraints_size=constraints_fraction,
+            param_copkmeans_init="random")
+
+        if include_older_algorithms:
             norm_hdbscan_pred, norm_hdbscan_evals = clu_lss.evaluate(
                     alg_option=Clusterer.alg_h_dbscan)
 
@@ -111,11 +121,6 @@ class TestApproach:
 
             n_optics_pred, n_optics_evals = clu_lss.evaluate(
                     alg_option=Clusterer.alg_optics)
-
-        cop_kmeans_pred, cop_kmeans_evals = clu_lss.evaluate(
-            alg_option=Clusterer.alg_cop_kmeans,
-            param_constraints_size=0.08,
-            param_copkmeans_init="random")
 
         # Baselines
         bl_rand_pred, bl_rand_evals = clu_lss.evaluate(
@@ -248,34 +253,46 @@ class TestApproach:
 
         problemsets_results = []
         k_vals = []
+        failures = []
         # Detect if we're dealing with the train or test data
         r = range(1, 121) if not train_phase else range(1, 61)
         for ps in r:
-            print(f"\nVectorising problem set ► {ps:03d} ◄ ..")
-            plain_docs, bow_rep_docs, lss_rep_docs = tester._vectorise_ps(
-                    ps,
-                    infer_lss=infer,
-                    hdp_eta=eta,
-                    hdp_gamma_s=gamma,
-                    hdp_alpha_s=alpha,
-                    drop_uncommon_terms=drop_uncommon)
-            lss_rep_docs = Tools.normalise_data(lss_rep_docs)
+            try:
+                print(f"\nVectorising problem set ► {ps:03d} ◄ ..")
+                plain_docs, bow_rep_docs, lss_rep_docs = tester._vectorise_ps(
+                        ps,
+                        infer_lss=infer,
+                        hdp_eta=eta,
+                        hdp_gamma_s=gamma,
+                        hdp_alpha_s=alpha,
+                        drop_uncommon_terms=drop_uncommon)
+                lss_rep_docs = Tools.normalise_data(lss_rep_docs)
 
-            # Begin Clustering Attempts
-            print("Clustering ..")
-            ground_truth = self._get_ps_truth(ps)
-            ps_res, k_trends = tester._cluster_data(ps, data=lss_rep_docs,
-                                                    ground_truth=ground_truth,
-                                                    desired_k=desired_k)
-            problemsets_results.append(ps_res)
-            k_vals.append(k_trends)
+                # Begin Clustering Attempts
+                print("Clustering ..")
+                ground_truth = self._get_ps_truth(ps)
+                ps_res, k_trends = tester._cluster_data(
+                    ps, data=lss_rep_docs,
+                    ground_truth=ground_truth,
+                    desired_k=desired_k)
+                problemsets_results.append(ps_res)
+                k_vals.append(k_trends)
 
-        print("\nSaving Results ..")
-        path = tester._save_results(
-                suffix=f"{save_name_suff}_{configuration}",
-                info_path=r"..\..\Datasets\pan17_test\info.json",
-                results=problemsets_results,
-                k_values=k_vals)
+                print("» Saving Results ..")
+                path = tester._save_results(
+                        suffix=f"{save_name_suff}_{configuration}",
+                        info_path=r"..\..\Datasets\pan17_test\info.json",
+                        results=problemsets_results,
+                        k_values=k_vals)
+            except AttributeError as excp:
+                failures.append(ps)
+                print(f"> ERROR: {excp}.\n> Skipping..")
+                pass
+        if (len(failures) != 0):
+            print(f"{len(failures)/len(lss_rep_docs)} problem(s) skipped.")
+            Tools.save_list_to_text(mylist=failures,
+                                    filepath=r"./__outputs__/skipped.txt",
+                                    header=r"Skipped PS train 12%")
         return path
 
 

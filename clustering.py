@@ -395,7 +395,7 @@ class Clusterer:
         """
         For KMeans++ initialisation, "kmpp" is to be used instead of random.
         """
-        # 2DO: fix the ZeroDivisionError when using kmpp due to the
+        # TODO: fix the ZeroDivisionError when using kmpp due to the
         # infinitisimal values of chances array. This can make better early
         # decisions and hence may prevent a failure with some constraint sets
 
@@ -430,6 +430,8 @@ class Clusterer:
 
         must_l, cant_l, _ = elicit_constraints(truth=truth,
                                                prct=constraints_size)
+
+        # TODO: Perhabs we will need to estimate k knowing the constraints...
         pred, _ = cop_kmeans(dataset=self.data.to_numpy(),
                              k=self.k,
                              ml=must_l,
