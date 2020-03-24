@@ -248,12 +248,14 @@ class Tools:
 
     @staticmethod
     def save_k_vals_as_df(k_vals: List[List],
+                          cop_kmeans_frac: float,
                           suffix="",
                           test_data: bool = False):
         df_k_vals = pd.DataFrame(k_vals,
                                  columns=["E_SPKMeans",
                                           "Gap",
                                           "G-means",
+                                          "E_COP_KMEANS",
                                           "E_HAC_C",
                                           "E_HAC_S",
                                           "E_HAC_A",

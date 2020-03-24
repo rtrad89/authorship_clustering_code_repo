@@ -225,15 +225,18 @@ class Clusterer:
         -------
             A array of clusterings with many runs to estimate k
         """
-
+        # For proper saving of k_vals, this must be called first
         # Pay attention that k-means++ initialiser may be using Eucledian
         # distances still.. but l2 norms approx
         preds = []
         if self.estimated_k:
             cands = []
             for rc in range(0, runs):
+                # Get the estimated final k,
+                # and the Gap and GMeans values in cand
                 n, cand = self._estimate_k(include_bic=self.bic,
                                            include_gap=self.gap)
+                # Append the three values
                 cands.append(cand)
                 skm = SphericalKMeans(n_clusters=n, init=init,
                                       random_state=None, normalize=False)
@@ -395,6 +398,8 @@ class Clusterer:
         """
         For KMeans++ initialisation, "kmpp" is to be used instead of random.
         """
+        # For proper saving of k_vals, this must be called second, after spkm
+
         # TODO: fix the ZeroDivisionError when using kmpp due to the
         # infinitisimal values of chances array. This can make better early
         # decisions and hence may prevent a failure with some constraint sets
@@ -432,12 +437,22 @@ class Clusterer:
                                                prct=constraints_size)
 
         # TODO: Perhabs we will need to estimate k knowing the constraints...
+        constrainted_k = self.constraint_based_estimate_k()
+        # Assign the new k to the Clusterer for saving to disk later, if any
+        if self.estimated_k:
+            self.cand_k.append(constrainted_k)
         pred, _ = cop_kmeans(dataset=self.data.to_numpy(),
-                             k=self.k,
+                             k=constrainted_k,
                              ml=must_l,
                              cl=cant_l,
                              initialization=initialisation)
         return pred
+
+    def constraint_based_estimate_k(self):
+        # TODO: Make estimations based on constraints
+        # For now, return SPKMeans k
+
+        return self.k
 
     def _bl_random(self):
         rand_k = random.randint(1, len(self.data) + 1)
@@ -541,7 +556,17 @@ class Clusterer:
                  param_constraints_size: float = 0.05,
                  param_copkmeans_init: str = "random"):
 
-        if alg_option == Clusterer.alg_h_dbscan:
+        if alg_option == Clusterer.alg_spherical_k_means:
+            # Here an array will be returned
+            clustering_labels = self._cluster_spherical_kmeans(
+                    init=param_init)
+
+        elif alg_option == Clusterer.alg_cop_kmeans:
+            clustering_labels = self._cluster_cop_kmeans(
+                    constraints_size=param_constraints_size,
+                    initialisation=param_copkmeans_init)
+
+        elif alg_option == Clusterer.alg_h_dbscan:
             clustering_labels = self._cluster_hdbscan()
 
         elif alg_option == Clusterer.alg_hac:
@@ -558,18 +583,8 @@ class Clusterer:
         elif alg_option == Clusterer.alg_optics:
             clustering_labels = self._cluster_optics()
 
-        elif alg_option == Clusterer.alg_spherical_k_means:
-            # Here an array will be returned
-            clustering_labels = self._cluster_spherical_kmeans(
-                    init=param_init)
-
         elif alg_option == Clusterer.alg_x_means:
             clustering_labels = self._cluster_xmeans()
-
-        elif alg_option == Clusterer.alg_cop_kmeans:
-            clustering_labels = self._cluster_cop_kmeans(
-                    constraints_size=param_constraints_size,
-                    initialisation=param_copkmeans_init)
 
         elif alg_option == Clusterer.bl_random:
             clustering_labels = self._bl_random()
