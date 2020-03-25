@@ -392,80 +392,117 @@ class Clusterer:
             self.cand_k.append(1+max(pred))
         return pred
 
-    def _cluster_cop_kmeans(self,
-                            constraints_size: float = 0.05,
-                            initialisation: str = "random"):
+    def _elicit_random_constraints(self,
+                                   truth: pd.Series,
+                                   prct: float = 0.05):
         """
-        For KMeans++ initialisation, "kmpp" is to be used instead of random.
+        Generate ML and NL constraints from the ground truth for COPKMeans
         """
-        # For proper saving of k_vals, this must be called second, after spkm
+        n = len(truth)
+        links_space_size = .5 * n * (n-1)
+        required_links = round(prct * links_space_size)
+        pairs = set()
+        random.seed(13712)
+        while (len(pairs) < required_links):
+            linking_docs = tuple(random.sample(range(0, len(truth)), 2))
+            # Avoid the other permutation of the same link
+            i_linking_docs = (linking_docs[1], linking_docs[0])
+            if i_linking_docs not in pairs:
+                pairs.add(linking_docs)
+        # Build the must-link and cannot-link sets
+        must_link, cannot_link = [], []
+        for p in pairs:
+            d1, d2 = p
+            must_be_linked = (truth[[d1, d2]].nunique() == 1)
+            if must_be_linked:
+                must_link.append(p)
+            else:
+                cannot_link.append(p)
+        return must_link, cannot_link, pairs
 
-        # TODO: fix the ZeroDivisionError when using kmpp due to the
-        # infinitisimal values of chances array. This can make better early
-        # decisions and hence may prevent a failure with some constraint sets
+    def _elicit_author_based_const(self,
+                                   truth: pd.Series):
+        pass
 
+    def _cluster_constraint_based_estimate_k(self,
+                                             constraints_size: float = 0.05,
+                                             initialisation: str = "random",
+                                             random_const: bool = True):
+        """
+        A controller that runs COP KMEANS n-2 times and selects the best model.
+
+        Parameters
+        ----------
+        random_const : bool
+            True whether constraints are to be generated randomly;
+            False if constraints are generated author-wise.
+
+        Returns
+        -------
+        list
+            The clustering of the best COP KMEANS chosen via grid search..
+
+        """
+        # Generate the constraints once
         truth = self.true_labels.sort_index()
+        if random_const:
+            must_l, cant_l, _ = self._elicit_random_constraints(
+                truth=truth,
+                prct=constraints_size)
+        else:
+            must_l, cant_l, _ = self._elicit_author_based_const(
+                truth=truth)
 
-        def elicit_constraints(truth: pd.Series,
-                               prct: float = 0.05):
-            """
-            Generate ML and NL constraints from the ground truth for COPKMeans
-            """
-            n = len(truth)
-            links_space_size = .5 * n * (n-1)
-            required_links = round(prct * links_space_size)
-            pairs = set()
-            random.seed(13712)
-            while (len(pairs) < required_links):
-                linking_docs = tuple(random.sample(range(0, len(truth)), 2))
-                # Avoid the other permutation of the same link
-                i_linking_docs = (linking_docs[1], linking_docs[0])
-                if i_linking_docs not in pairs:
-                    pairs.add(linking_docs)
-            # Build the must-link and cannot-link sets
-            must_link, cannot_link = [], []
-            for p in pairs:
-                d1, d2 = p
-                must_be_linked = (truth[[d1, d2]].nunique() == 1)
-                if must_be_linked:
-                    must_link.append(p)
-                else:
-                    cannot_link.append(p)
-            return must_link, cannot_link, pairs
-
-        must_l, cant_l, _ = elicit_constraints(truth=truth,
-                                               prct=constraints_size)
-
-        # TODO: Perhabs we will need to estimate k knowing the constraints...
-        constrainted_k = self.constraint_based_estimate_k()
-        # Assign the new k to the Clusterer for saving to disk later, if any
+        # If k is to be estimated:
         if self.estimated_k:
-            self.cand_k.append(constrainted_k)
-        pred, _ = cop_kmeans(dataset=self.data.to_numpy(),
-                             k=constrainted_k,
-                             ml=must_l,
-                             cl=cant_l,
-                             initialization=initialisation)
-        return pred
+            stats = []
 
-    def constraint_based_estimate_k(self):
-        # TODO: Make estimations based on constraints
-        # For now, return SPKMeans k
+            for k in range(2, len(self.data)):
+                try:
+                    pred, _ = cop_kmeans(dataset=self.data.to_numpy(),
+                                         k=k,
+                                         ml=must_l,
+                                         cl=cant_l,
+                                         initialization=initialisation)
+                    # Calculate DB index
+                    if pred is not None:  # Flagging a failure to cluster
+                        dvbo = davies_bouldin_score(X=self.data, labels=pred)
+                        stats.append([k, dvbo, pred])
+                except IndexError:
+                    print("\t\tGrid Search Infeasible: "
+                          f"Attempting COP-KMEANS with k={k} failed; "
+                          "skipping..")
 
-        return self.k
+            # Detect the best k and the best clustering based on DB index
+            df_stats = pd.DataFrame(stats, columns=["k", "dvbo", "pred"])
+            # Pick the lowers db score
+            best_record = df_stats[df_stats.dvbo == df_stats.dvbo.min()]
+            # If more than one minimum is there,
+            # opt for the smallest k as it is less likely to be an overfit
+            best_record = best_record[best_record.k == best_record.k.min()]
+            self.cand_k.append(int(best_record.k))
+
+            return best_record.pred.tolist()[0]
+        else:
+            pred, _ = cop_kmeans(dataset=self.data.to_numpy(),
+                                 k=self.k,
+                                 ml=must_l,
+                                 cl=cant_l,
+                                 initialization=initialisation)
+            return pred
 
     def _bl_random(self):
         rand_k = random.randint(1, len(self.data) + 1)
         # Assign doucments on random
-        return random.choices(population=list(range(rand_k)),
-                              k=len(self.data))
+        return random.choices(
+            population=list(range(rand_k)),
+            k=len(self.data))
 
     def _bl_singleton(self):
         return list(range(len(self.data)))
 
     def _hdp_topic_clusters(self):
-        """
-        Convert the topic ascriptions to deterministic clusters using max
+        """Convert the topic ascriptions to deterministic clusters using max.
 
         Returns
         -------
@@ -554,7 +591,8 @@ class Clusterer:
                  param_linkage: str = None,
                  param_init: str = None,
                  param_constraints_size: float = 0.05,
-                 param_copkmeans_init: str = "random"):
+                 param_copkmeans_init: str = "random",
+                 param_copkmeans_random_constraints: bool = True):
 
         if alg_option == Clusterer.alg_spherical_k_means:
             # Here an array will be returned
@@ -562,9 +600,10 @@ class Clusterer:
                     init=param_init)
 
         elif alg_option == Clusterer.alg_cop_kmeans:
-            clustering_labels = self._cluster_cop_kmeans(
+            clustering_labels = self._cluster_constraint_based_estimate_k(
                     constraints_size=param_constraints_size,
-                    initialisation=param_copkmeans_init)
+                    initialisation=param_copkmeans_init,
+                    random_const=param_copkmeans_random_constraints)
 
         elif alg_option == Clusterer.alg_h_dbscan:
             clustering_labels = self._cluster_hdbscan()
@@ -607,7 +646,7 @@ class Clusterer:
                         aligned_labels.true,
                         aligned_labels.predicted)
             else:
-                # We have a list of predictions
+                # We have a list of predictions of many runs of an algo
                 res = defaultdict(list)
                 for c in range(0, len(clustering_labels)):
                     predicted = pd.Series(index=self.data.index,

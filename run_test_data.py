@@ -13,7 +13,7 @@ import warnings
 
 warnings.filterwarnings(action="ignore")  # Supress warning for this code file
 train_phase = True
-include_older_algorithms = True  # False is suitable to test new algorithms
+include_older_algorithms = True  # False helps to test newly added algorithms
 nbr_competing_methods = 8  # How many methods are examined? For saving results
 # Controlling variable for CBC
 constraints_fraction = 0.12
@@ -261,9 +261,9 @@ class TestApproach:
         r = range(1, 121) if not train_phase else range(1, 61)
         start = tpc()
         for ps in r:
-            print(f"\n({tpc()-start:05.1f}s) Problem Set ► {ps:03d} ◄")
+            print(f"\n[{(tpc()-start)/60:06.2f}m] Problem Set ► {ps:03d} ◄")
             try:
-                print(f"({tpc()-start:05.1f}s)\tVectorising..")
+                print(f"[{(tpc()-start)/60:06.2f}m]\tVectorising..")
                 plain_docs, bow_rep_docs, lss_rep_docs = tester._vectorise_ps(
                         ps,
                         infer_lss=infer,
@@ -274,7 +274,7 @@ class TestApproach:
                 lss_rep_docs = Tools.normalise_data(lss_rep_docs)
 
                 # Begin Clustering Attempts
-                print(f"({tpc()-start:05.1f}s)\tClustering..")
+                print(f"[{(tpc()-start)/60:06.2f}m]\tClustering..")
                 ground_truth = self._get_ps_truth(ps)
                 ps_res, k_trends = tester._cluster_data(
                     ps, data=lss_rep_docs,
@@ -287,7 +287,7 @@ class TestApproach:
                 print(excp)
                 print(f"> ERROR: {excp}.\n> Skipping..")
                 pass
-            print(f"({tpc()-start:05.1f}s)\tDone.")
+            print(f"[{(tpc()-start)/60:06.2f}m]\tDone.")
 
         print("» Saving Results ..")
         path = tester._save_results(
@@ -302,7 +302,7 @@ class TestApproach:
                 filepath=r"./__outputs__/skipped.txt",
                 header=f"Skipped PS train 12% ({len(failures)})")
 
-        print(f"({tpc()-start:05.1f}s) All Done.")
+        print(f"[{(tpc()-start)/60:06.2f}m] All Done.")
         return path
 
 
@@ -328,13 +328,13 @@ if __name__ == "__main__":
 #                     desired_k=None)
 # =============================================================================
 
-    # print("========== SPARSE ==========")
-    # sparse = tester.run_test(
-    #         configuration=TestApproach.config_sparse,
-    #         drop_uncommon=True,
-    #         save_name_suff="_final",
-    #         infer=False,
-    #         desired_k=None)
+    print("========== SPARSE ==========")
+    sparse = tester.run_test(
+            configuration=TestApproach.config_sparse,
+            drop_uncommon=True,
+            save_name_suff="_final",
+            infer=False,
+            desired_k=None)
 
 # =============================================================================
 #     # Run Friedman-Nemenyi test with Bonferroni correction for multiple tests
