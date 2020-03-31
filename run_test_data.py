@@ -360,11 +360,11 @@ if __name__ == "__main__":
 #                     desired_k=0)
 # =============================================================================
 
-    print("========== SPARSE-K ==========")
-    tester.run_test(configuration=TestApproach.config_sparse,
-                    drop_uncommon=True,
-                    save_name_suff="_final_trueK",
-                    infer=False,
-                    desired_k=0)
+    # print("========== SPARSE-K ==========")
+    # tester.run_test(configuration=TestApproach.config_sparse,
+    #                 drop_uncommon=True,
+    #                 save_name_suff="_final_trueK",
+    #                 infer=False,
+    #                 desired_k=0)
 
     print("\n▬▬▬▬▬▬▬▬▬▬▬▬(FINISHED)▬▬▬▬▬▬▬▬▬▬▬")
