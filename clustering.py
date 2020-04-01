@@ -482,14 +482,19 @@ class Clusterer:
             df_stats["score"] = df_stats.dbi * df_stats.k
             # df_stats["score"] = df_stats.dbi * df_stats.k.apply(log)
             # Inspired by AIC with Sil instead of L
-            # df_stats["score"] = (2 * df_stats.k) - (2 * df_stats.sil)
-            print(df_stats[["k", "score", "dbi", "sil"]])
-            # Pick the lowers db score
+            # df_stats["score2"] = (2 * df_stats.k) - (2 * df_stats.sil)
+            # A score depending on sil
+            # df_stats["score"] = df_stats.sil / df_stats.k
+            # print(df_stats[["k", "score", "dbi", "sil"]])
+            # Pick the lowest db score
             best_record = df_stats[df_stats.score == df_stats.score.min()]
-            # If more than one minimum is there,
+            # OR PICK THE HIGHEST SIL SCORE
+            # best_record = df_stats[df_stats.score == df_stats.score.max()]
+
+            # If more than one optimum is there,
             # opt for the smallest k as it is less likely to be an overfit
             best_record = best_record[best_record.k == best_record.k.min()]
-            print(best_record)
+            # print(best_record)
             self.cand_k.append(int(best_record.k))
 
             return best_record.pred.tolist()[0]

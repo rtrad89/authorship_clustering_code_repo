@@ -255,7 +255,7 @@ class Tools:
                                  columns=["E_SPKMeans",
                                           "Gap",
                                           "G-means",
-                                          "E_COP_KMEANS",
+                                          "E_COP_KMeans",
                                           "E_HAC_C",
                                           "E_HAC_S",
                                           "E_HAC_A",

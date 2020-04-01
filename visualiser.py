@@ -6,6 +6,7 @@ A class which caters to visualisation
 @author: RTRAD
 """
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from aiders import Tools
@@ -57,8 +58,8 @@ class Visualiser():
                                   "weight": "bold",
                                   "size": size})
 
-        if isinstance(axs, pd.np.ndarray):
-            for idx, ax in pd.np.ndenumerate(axs):
+        if isinstance(axs, np.ndarray):
+            for idx, ax in np.ndenumerate(axs):
                 _show_on_single_plot(ax)
         else:
             _show_on_single_plot(axs)
@@ -395,57 +396,70 @@ class Visualiser():
                         concise: bool,
                         test_style: bool,
                         sparse_path: str,
-                        neutral_path: str,
-                        dense_path: str,
-                        key_suff: str):
-
-        df_neutral_res = pd.read_csv(neutral_path, low_memory=False,
-                                     usecols=["set", "algorithm", "ari",
-                                              "bcubed_fscore", "language",
-                                              "genre"])
-        df_neutral_res = df_neutral_res[df_neutral_res.algorithm != "Labels"]
+                        key_suff: str,
+                        neutral_path: str = None,
+                        dense_path: str = None):
+        # TODO: segment the visualisation to reduce if statements count
         df_sparse_res = pd.read_csv(sparse_path, low_memory=False,
                                     usecols=["set", "algorithm", "ari",
                                              "bcubed_fscore", "language",
                                              "genre"])
         df_sparse_res = df_sparse_res[df_sparse_res.algorithm != "Labels"]
-        df_dense_res = pd.read_csv(dense_path, low_memory=False,
-                                   usecols=["set", "algorithm", "ari",
-                                            "bcubed_fscore", "language",
-                                            "genre"])
-        df_dense_res = df_dense_res[df_dense_res.algorithm != "Labels"]
+
+        if neutral_path:
+            df_neutral_res = pd.read_csv(neutral_path, low_memory=False,
+                                         usecols=["set", "algorithm", "ari",
+                                                  "bcubed_fscore", "language",
+                                                  "genre"])
+            df_neutral_res = df_neutral_res[
+                df_neutral_res.algorithm != "Labels"]
+
+        if dense_path:
+            df_dense_res = pd.read_csv(dense_path, low_memory=False,
+                                       usecols=["set", "algorithm", "ari",
+                                                "bcubed_fscore", "language",
+                                                "genre"])
+            df_dense_res = df_dense_res[df_dense_res.algorithm != "Labels"]
 
         # Filter out redundant algorithms:
         if concise:
-            df_neutral_res = df_neutral_res[
-                    ~df_neutral_res.algorithm.isin(
-                            ["E_HDBSCAN", "E_HAC_Single", "E_HAC_Average"])]
             df_sparse_res = df_sparse_res[
                     ~df_sparse_res.algorithm.isin(
                             ["E_HDBSCAN", "E_HAC_Single", "E_HAC_Average"])]
-            df_dense_res = df_dense_res[
-                    ~df_dense_res.algorithm.isin(
-                            ["E_HDBSCAN", "E_HAC_Single", "E_HAC_Average"])]
+            if neutral_path:
+                df_neutral_res = df_neutral_res[
+                        ~df_neutral_res.algorithm.isin(
+                                ["E_HDBSCAN", "E_HAC_Single", "E_HAC_Average"]
+                                )]
+            if dense_path:
+                df_dense_res = df_dense_res[
+                        ~df_dense_res.algorithm.isin(
+                                ["E_HDBSCAN", "E_HAC_Single", "E_HAC_Average"]
+                                )]
 
         if test_style:
             df_all = df_sparse_res
-        else:
+        elif neutral_path and dense_path:
             df_all = pd.concat(
                     [df_neutral_res, df_sparse_res, df_dense_res],
                     axis=0,
                     keys=["Neutral", "Sparse", "Dense"]
                     ).reset_index(level=0).rename(
                             columns={"level_0": "topics_prior"})
+        else:
+            print("Neutral and dense results are expected but not provided!")
 
         algo_order = ["BL_r", "BL_s", "BL_SOTA_tf",
                       "BL_SOTA_tfidf", "BL_SOTA_le",
                       "S_HDP",
-                      "E_HAC_C", "E_Mean_Shift", "E_OPTICS", "E_SPKMeans"]
+                      "E_HAC_C", "E_Mean_Shift", "E_OPTICS", "E_SPKMeans",
+                      "E_COP_KMeans"]
 
         colours = ["#fafafc", "#fafafc",
                    "#84d674", "#84d674", "#84d674",
                    "#f3f571",
-                   "#3c6cf0", "#3c6cf0", "#3c6cf0", "#3c6cf0"]
+                   "#3c6cf0", "#3c6cf0", "#3c6cf0", "#3c6cf0",
+                   "#3c6cf0"]
         fig_overall_b3f, ax_overall_b3f = plt.subplots(nrows=1,
                                                        ncols=1,
                                                        clear=True,
@@ -640,7 +654,7 @@ class Visualiser():
         df_est = df_est[df_est.algorithm != "Labels"]
         df_est = df_est[
                 df_est.algorithm.isin(
-                        ["E_HAC_C", "E_SPKMeans"])]
+                        ["E_HAC_C", "E_SPKMeans", "E_COP_KMeans"])]
 
         df_true = pd.read_csv(true_path,
                               usecols=["set", "algorithm", "ari",
@@ -649,7 +663,7 @@ class Visualiser():
         df_true = df_true[df_true.algorithm != "Labels"]
         df_true = df_true[
                 df_true.algorithm.isin(
-                        ["E_HAC_C", "E_SPKMeans"])]
+                        ["E_HAC_C", "E_SPKMeans", "E_COP_KMeans"])]
 
         # Merge the two dataframes
         df_all = df_est.merge(df_true, on=["set", "algorithm"],
@@ -667,15 +681,15 @@ class Visualiser():
                                clear=True,
                                figsize=self.square)
 
-        sns.catplot(data=df_all, x="algorithm", y="value", hue="measurement",
-                    ax=ax, kind="bar")
+        sns.barplot(data=df_all, x="algorithm", y="value", hue="measurement",
+                    ax=ax)
         # Rotate the axes 90 degrees
         for a in fig.axes:
             plt.sca(a)
             a.set_xlabel("")
             plt.xticks(rotation=90)
         # Annotate the bars
-        self.show_values_on_bars(ax, size=18)
+        self.show_values_on_bars(ax, size=13)
         # Output the chart
         plt.legend(loc="upper left", bbox_to_anchor=(0, 0.8))
         plt.tight_layout()
@@ -695,34 +709,35 @@ class Visualiser():
             k_vals = pd.read_csv(k_vals_path, low_memory=False,
                                  usecols=["Gap", "G-means", "E_SPKMeans",
                                           "E_HAC_C", "E_OPTICS",
+                                          "E_COP_KMeans",
                                           "TRUE"]
                                  )[["Gap", "G-means", "E_SPKMeans",
-                                    "E_HAC_C", "E_OPTICS", "TRUE"]]
+                                    "E_HAC_C", "E_OPTICS", "E_COP_KMeans",
+                                    "TRUE"]]
         else:
             k_vals = pd.read_csv(k_vals_path, low_memory=False, index_col=0)
 
-        # FOR TRIAL
-#        k_vals["ex_bic_avg"] = .5 * (k_vals["gap"] + k_vals["gmeans"])
-#        k_vals["ex_bic_hac_avg"] = (k_vals["gap"] + k_vals["gmeans"]
-#                                    + k_vals["hac_c"]) / 3
-
-        fig, ax = plt.subplots(nrows=1,
-                               ncols=3,
+        fig, ax = plt.subplots(nrows=2,
+                               ncols=2,
                                clear=True,
-                               figsize=self.rectangle,
+                               figsize=self.landscape,
                                sharex="col")
 
         sns.scatterplot(x="TRUE", y="E_SPKMeans", color=".0",
                         marker="X",
-                        ax=ax[0],
+                        ax=ax[0, 0],
                         data=k_vals)
         sns.scatterplot(x="TRUE", y="E_HAC_C", color=".0",
                         marker="P",
-                        ax=ax[1],
+                        ax=ax[0, 1],
                         data=k_vals)
         sns.scatterplot(x="TRUE", y="E_OPTICS", color=".0",
                         marker="^",
-                        ax=ax[2],
+                        ax=ax[1, 0],
+                        data=k_vals)
+        sns.scatterplot(x="TRUE", y="E_COP_KMeans", color=".0",
+                        marker="s",
+                        ax=ax[1, 1],
                         data=k_vals)
 
         if not concise:
@@ -774,10 +789,11 @@ class Visualiser():
                     ax=ax_rmse,
                     order=["BL_SOTA_tf", "BL_SOTA_tfidf", "BL_SOTA_le",
                            "Gap", "G-means",
-                           "E_HAC_C", "E_OPTICS", "E_SPKMeans"],
+                           "E_HAC_C", "E_OPTICS", "E_SPKMeans",
+                           "E_COP_KMeans"],
                     palette=["#84d674", "#84d674", "#84d674",
                              "#fafafc", "#fafafc",
-                             "#3c6cf0", "#3c6cf0", "#3c6cf0"],
+                             "#3c6cf0", "#3c6cf0", "#3c6cf0", "#3c6cf0"],
                     edgecolor=".2")
 
         # Rotate the x axes
@@ -975,59 +991,54 @@ if __name__ == "__main__":
 # =============================================================================
 
     # Now the test data
-    sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-              r"\authorship_clustering_code_repo\__outputs__\TESTS"
-              r"\results_20191011_040654_final_sparse.csv")
-    dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-             r"\authorship_clustering_code_repo\__outputs__\TESTS"
-             r"\results_20191028_204221_final_dense.csv")
-    neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-               r"\authorship_clustering_code_repo\__outputs__\TESTS"
-               r"\results_20191028_201333_final_neutral.csv")
+    sparse = (r".\__outputs__\TESTS"
+              r"\results_20200331_152943_final_sparse.csv")
+    # dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+    #          r"\authorship_clustering_code_repo\__outputs__\TESTS"
+    #          r"\results_20191028_204221_final_dense.csv")
+    # neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+    #            r"\authorship_clustering_code_repo\__outputs__\TESTS"
+    #            r"\results_20191028_201333_final_neutral.csv")
 
-    k_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-                r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                r"\k_trend_20191011_040654_final_sparse.csv")
-    k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-               r"\authorship_clustering_code_repo\__outputs__\TESTS"
-               r"\k_trend_20191028_204221_final_dense.csv")
-    k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-                 r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                 r"\k_trend_20191028_201334_final_neutral.csv")
+    k_sparse = (r".\__outputs__\TESTS"
+                r"\k_trend_20200331_152943_final_sparse.csv")
+    # k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+    #            r"\authorship_clustering_code_repo\__outputs__\TESTS"
+    #            r"\k_trend_20191028_204221_final_dense.csv")
+    # k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+    #              r"\authorship_clustering_code_repo\__outputs__\TESTS"
+    #              r"\k_trend_20191028_201334_final_neutral.csv")
 
-    trace_sparse = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
+    trace_sparse = (r"..\..\Datasets"
                     r"\pan17_test\problem015\lss_0.30_0.10_0.10_common_True"
                     r"\state.log")
-    trace_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
-                   r"\pan17_test\problem015\lss_0.80_1.50_1.50_common_True"
-                   r"\state.log")
-    trace_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
-                     r"\pan17_test\problem015\lss_0.50_1.00_1.00_common_True"
-                     r"\state.log")
+    # trace_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
+    #                r"\pan17_test\problem015\lss_0.80_1.50_1.50_common_True"
+    #                r"\state.log")
+    # trace_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
+    #                  r"\pan17_test\problem015\lss_0.50_1.00_1.00_common_True"
+    #                  r"\state.log")
 
-    sparse_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-                     r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                     r"\results_20191011_040752_final_trueK_sparse.csv")
-    dense_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-                    r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                    r"\results_20191029_142920_final_trueK_dense.csv")
-    neutral_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-                      r"\authorship_clustering_code_repo\__outputs__\TESTS"
-                      r"\results_20191029_142810_final_trueK_neutral.csv")
+    sparse_true_k = (r".\__outputs__\TESTS"
+                     r"\results_20200331_153147_final_trueK_sparse.csv")
+    # dense_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+    #                 r"\authorship_clustering_code_repo\__outputs__\TESTS"
+    #                 r"\results_20191029_142920_final_trueK_dense.csv")
+    # neutral_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
+    #                   r"\authorship_clustering_code_repo\__outputs__\TESTS"
+    #                   r"\results_20191029_142810_final_trueK_neutral.csv")
 
     vis.visualise_cluster_sizes_hist(
             train_only=False,
-            train_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
-                        r"\Datasets\pan17_train"),
-            test_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
-                       r"\Datasets\pan17_test")
+            train_path=(r"..\..\Datasets\pan17_train"),
+            test_path=(r"..\..\Datasets\pan17_test")
             )
 
     vis.analyse_results(concise=True,
                         test_style=True,
                         sparse_path=sparse,
-                        dense_path=dense,
-                        neutral_path=neutral,
+                        dense_path=None,
+                        neutral_path=None,
                         key_suff="_est_k")
 
     vis.analyse_k_trends(concise=True,
@@ -1058,4 +1069,4 @@ if __name__ == "__main__":
 #                      r"\TESTS\Friedman_Nemenyi_B3F_a_0.0500.csv"),
 #            a=0.05)
     # Serialise the cached pool to disk
-    vis.serialise_figs(charts_format="eps")
+    # vis.serialise_figs(charts_format="eps")

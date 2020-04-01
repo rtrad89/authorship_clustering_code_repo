@@ -12,7 +12,7 @@ from time import perf_counter as tpc
 import warnings
 
 warnings.filterwarnings(action="ignore")  # Supress warning for this code file
-train_phase = True
+train_phase = True  # If True, the "test" folder must contains training data
 include_older_algorithms = True  # False helps to test newly added algorithms
 nbr_competing_methods = 8  # How many methods are examined? For saving results
 # Controlling variable for CBC
