@@ -29,7 +29,6 @@ import random
 from collections import defaultdict
 from cop_kmeans import cop_kmeans
 from sys import exit
-from math import log
 
 
 class Clusterer:
@@ -340,10 +339,6 @@ class Clusterer:
             hac_k, _, pred = self._select_best_hac(linkage=linkage,
                                                    verbose=False)
             self.cand_k.append(hac_k)
-            # Use an average of all the methods for the estimation
-            # k = round((hac_k + sum(self.cand_k)) / (1+len(self.cand_k)))
-            # Append the calculated average
-            # self.cand_k.append(k)
         else:
             hac_k = self.k
 
@@ -478,23 +473,13 @@ class Clusterer:
             # Detect the best k and the best clustering based on DB index
             df_stats = pd.DataFrame(stats, columns=["k", "dbi", "sil", "pred"])
             # Calculate the penalised score per each k
-            # df_stats["score"] = df_stats.dbi * df_stats.k**2
             df_stats["score"] = df_stats.dbi * df_stats.k
-            # df_stats["score"] = df_stats.dbi * df_stats.k.apply(log)
-            # Inspired by AIC with Sil instead of L
-            # df_stats["score2"] = (2 * df_stats.k) - (2 * df_stats.sil)
-            # A score depending on sil
-            # df_stats["score"] = df_stats.sil / df_stats.k
-            # print(df_stats[["k", "score", "dbi", "sil"]])
             # Pick the lowest db score
             best_record = df_stats[df_stats.score == df_stats.score.min()]
-            # OR PICK THE HIGHEST SIL SCORE
-            # best_record = df_stats[df_stats.score == df_stats.score.max()]
 
             # If more than one optimum is there,
             # opt for the smallest k as it is less likely to be an overfit
             best_record = best_record[best_record.k == best_record.k.min()]
-            # print(best_record)
             self.cand_k.append(int(best_record.k))
 
             return best_record.pred.tolist()[0]

@@ -993,40 +993,16 @@ if __name__ == "__main__":
     # Now the test data
     sparse = (r".\__outputs__\TESTS"
               r"\results_20200331_152943_final_sparse.csv")
-    # dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-    #          r"\authorship_clustering_code_repo\__outputs__\TESTS"
-    #          r"\results_20191028_204221_final_dense.csv")
-    # neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-    #            r"\authorship_clustering_code_repo\__outputs__\TESTS"
-    #            r"\results_20191028_201333_final_neutral.csv")
 
     k_sparse = (r".\__outputs__\TESTS"
                 r"\k_trend_20200331_152943_final_sparse.csv")
-    # k_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-    #            r"\authorship_clustering_code_repo\__outputs__\TESTS"
-    #            r"\k_trend_20191028_204221_final_dense.csv")
-    # k_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-    #              r"\authorship_clustering_code_repo\__outputs__\TESTS"
-    #              r"\k_trend_20191028_201334_final_neutral.csv")
 
     trace_sparse = (r"..\..\Datasets"
                     r"\pan17_test\problem015\lss_0.30_0.10_0.10_common_True"
                     r"\state.log")
-    # trace_dense = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
-    #                r"\pan17_test\problem015\lss_0.80_1.50_1.50_common_True"
-    #                r"\state.log")
-    # trace_neutral = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Datasets"
-    #                  r"\pan17_test\problem015\lss_0.50_1.00_1.00_common_True"
-    #                  r"\state.log")
 
     sparse_true_k = (r".\__outputs__\TESTS"
                      r"\results_20200331_153147_final_trueK_sparse.csv")
-    # dense_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-    #                 r"\authorship_clustering_code_repo\__outputs__\TESTS"
-    #                 r"\results_20191029_142920_final_trueK_dense.csv")
-    # neutral_true_k = (r"D:\College\DKEM\Thesis\AuthorshipClustering\Code"
-    #                   r"\authorship_clustering_code_repo\__outputs__\TESTS"
-    #                   r"\results_20191029_142810_final_trueK_neutral.csv")
 
     vis.visualise_cluster_sizes_hist(
             train_only=False,
@@ -1047,26 +1023,9 @@ if __name__ == "__main__":
     vis.plot_gibbs_trace(state_path=trace_sparse,
                          key_suff="_sparse")
 
-#    vis.analyse_k_trends(concise=True,
-#                         k_vals_path=k_dense,
-#                         key_suff="_dense")
-#    vis.plot_gibbs_trace(state_path=trace_dense,
-#                         key_suff="_dense")
-#
-#    vis.analyse_k_trends(concise=True,
-#                         k_vals_path=k_neutral,
-#                         key_suff="_neutral")
-#    vis.plot_gibbs_trace(state_path=trace_neutral,
-#                         key_suff="_neutral")
-
     vis.analyse_true_k_results(true_path=sparse_true_k,
                                est_path=sparse,
                                key_suff="_true_k")
 
-#    vis.visualise_nemenyi_post_hoc(
-#            b3f_path=(r"D:\College\DKEM\Thesis\AuthorshipClustering"
-#                      r"\Code\authorship_clustering_code_repo\__outputs__"
-#                      r"\TESTS\Friedman_Nemenyi_B3F_a_0.0500.csv"),
-#            a=0.05)
     # Serialise the cached pool to disk
     # vis.serialise_figs(charts_format="eps")
