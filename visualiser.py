@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from aiders import Tools
 from matplotlib.colors import ListedColormap
+from btm import topicDisplay
 
 
 class Visualiser():
@@ -891,6 +892,48 @@ class Visualiser():
         else:
             return fig_nemenyi, df_b3f
 
+    def visualise_btm_topics(self,
+                             model_dir: str,
+                             vocab_fpath: str,
+                             t: int = 5):
+        """ source:
+        www.github.com/xiaohuiyan/BTM/blob/master/script/topicDisplay.py"""
+
+        def read_voca(pt):
+            voca = {}
+            for l1 in open(pt):
+                wid, w = l1.strip().split('\t')[:2]
+                voca[int(wid)] = w
+            return voca
+
+        def read_pz(pt):
+            return [float(p) for p in open(pt).readline().split()]
+
+        # voca = {wid:w,...}
+        def dispTopics(pt, voca, pz):
+            k = 0
+            topics = []
+            for l2 in open(pt):
+                vs = [float(v) for v in l2.split()]
+                wvs = zip(range(len(vs)), vs)
+                wvs = sorted(wvs, key=lambda d: d[1], reverse=True)
+                tmps = ' '.join(['%s:%f' % (voca[w], v) for w, v in wvs[:10]])
+                topics.append((pz[k], tmps))
+                k += 1
+
+            print('p(z)\t\tTop words')
+            for pz, s in sorted(topics, reverse=True):
+                print('%f\t%s' % (pz, s))
+        voca = read_voca(vocab_fpath)
+        w = len(voca)
+        print('K:%d, n(W):%d' % (t, w))
+
+        pz_pt = model_dir + 'k%d.pz' % t
+        pz = read_pz(pz_pt)
+
+        zw_pt = model_dir + 'k%d.pw_z' % t
+        dispTopics(zw_pt, voca, pz)
+
     def serialise_figs(self,
                        out_dir: str = r".\__outputs__\charts",
                        name: str = "Charts",
@@ -990,42 +1033,44 @@ if __name__ == "__main__":
 #                          key_suff="_training_neutral")
 # =============================================================================
 
-    # Now the test data
-    sparse = (r".\__outputs__\TESTS"
-              r"\results_20200331_152943_final_sparse.csv")
-
-    k_sparse = (r".\__outputs__\TESTS"
-                r"\k_trend_20200331_152943_final_sparse.csv")
-
-    trace_sparse = (r"..\..\Datasets"
-                    r"\pan17_test\problem015\lss_0.30_0.10_0.10_common_True"
-                    r"\state.log")
-
-    sparse_true_k = (r".\__outputs__\TESTS"
-                     r"\results_20200331_153147_final_trueK_sparse.csv")
-
-    vis.visualise_cluster_sizes_hist(
-            train_only=False,
-            train_path=(r"..\..\Datasets\pan17_train"),
-            test_path=(r"..\..\Datasets\pan17_test")
-            )
-
-    vis.analyse_results(concise=True,
-                        test_style=True,
-                        sparse_path=sparse,
-                        dense_path=None,
-                        neutral_path=None,
-                        key_suff="_est_k")
-
-    vis.analyse_k_trends(concise=True,
-                         k_vals_path=k_sparse,
-                         key_suff="_sparse")
-    vis.plot_gibbs_trace(state_path=trace_sparse,
-                         key_suff="_sparse")
-
-    vis.analyse_true_k_results(true_path=sparse_true_k,
-                               est_path=sparse,
-                               key_suff="_true_k")
+# =============================================================================
+#     # Now the test data
+#     sparse = (r".\__outputs__\TESTS"
+#               r"\results_20200331_152943_final_sparse.csv")
+#
+#     k_sparse = (r".\__outputs__\TESTS"
+#                 r"\k_trend_20200331_152943_final_sparse.csv")
+#
+#     trace_sparse = (r"..\..\Datasets"
+#                     r"\pan17_test\problem015\lss_0.30_0.10_0.10_common_True"
+#                     r"\state.log")
+#
+#     sparse_true_k = (r".\__outputs__\TESTS"
+#                      r"\results_20200331_153147_final_trueK_sparse.csv")
+#
+#     vis.visualise_cluster_sizes_hist(
+#             train_only=False,
+#             train_path=(r"..\..\Datasets\pan17_train"),
+#             test_path=(r"..\..\Datasets\pan17_test")
+#             )
+#
+#     vis.analyse_results(concise=True,
+#                         test_style=True,
+#                         sparse_path=sparse,
+#                         dense_path=None,
+#                         neutral_path=None,
+#                         key_suff="_est_k")
+#
+#     vis.analyse_k_trends(concise=True,
+#                          k_vals_path=k_sparse,
+#                          key_suff="_sparse")
+#     vis.plot_gibbs_trace(state_path=trace_sparse,
+#                          key_suff="_sparse")
+#
+#     vis.analyse_true_k_results(true_path=sparse_true_k,
+#                                est_path=sparse,
+#                                key_suff="_true_k")
+# =============================================================================
 
     # Serialise the cached pool to disk
     # vis.serialise_figs(charts_format="eps")

@@ -54,7 +54,8 @@ class Tools:
     @staticmethod
     def initialise_directories(dir_path):
         """
-        Ensure an empty directory is created in `dir_path`.
+        Ensure an empty directory is created in `dir_path`, guaranteeing that
+        all the needed directories on the path are also created
 
         Parameters
         ----------

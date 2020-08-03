@@ -14,6 +14,7 @@ from aiders import Tools
 from typing import Tuple, List
 from collections import defaultdict
 import seaborn as sns
+from btm import indexDocs
 sns.set()
 
 
@@ -704,6 +705,108 @@ class LssOptimiser:
                     print(f"→ Skipping {output.name}")
 
 
+class LssBTModeller:
+
+    def __init__(self,
+                 directory_path: str,
+                 t: int,
+                 alpha: float,
+                 beta: float,
+                 btm_exe_path: str = r"..\BTM-master\src\btm.exe",
+                 n_iter: int = 1000,
+                 model_dir_name: str = "BTM",
+                 doc_inference_type: str = "sum_b"
+                 ):
+        self.directory_path = directory_path
+        self.t = t
+        self.alpha = alpha
+        self.beta = beta
+        self.n_iter = n_iter
+        self.doc_index = []  # the index of the files read for reference
+        self.w = None
+        self.btm_exe = btm_exe_path
+        self.doc_inf_type = doc_inference_type
+
+        self.output_dir = f"{directory_path}\\{model_dir_name}\\"
+        self.plain_corpus_path = f"{self.output_dir}btmcorpus.txt"
+        self.tokenised_btmcorpus_filepath = (f"{self.output_dir}vectorised\\"
+                                             "tokenised_btmcorpus.txt")
+        self.vocab_ids_path = f"{self.output_dir}vectorised\\voca_pt"
+        # Initialise the relevant directories
+        Tools.initialise_directories(self.output_dir)
+        Tools.initialise_directories(f"{self.output_dir}vectorised")
+
+    def _concatenate_docs_into_btmcorpus(self):
+        # Read in the plain text files
+        plain_documents = []
+        with Tools.scan_directory(self.directory_path) as docs:
+            for doc in docs:
+                if doc.is_dir():
+                    continue
+                try:
+                    f = open(doc.path, mode="r", encoding="utf8")
+                    plain_documents.append(f.read())
+                    self.doc_index.append(Tools.get_filename(doc.path))
+                except PermissionError:
+                    # Raised when trying to open a directory
+                    print("Skipped while loading files: {}"
+                          .format(doc.name))
+                    pass
+        # lowercase and strip \n away
+        plain_documents = [str.replace(d, "\n", "").lower()
+                           for d in plain_documents]
+        # save it to disk
+        Tools.save_list_to_text(mylist=plain_documents,
+                                filepath=self.plain_corpus_path)
+        return plain_documents
+
+    def _vectorise_btmcorpus(self):
+        # we call routines from indexDocs.py
+        indexDocs.indexFile(self.plain_corpus_path,
+                            self.tokenised_btmcorpus_filepath)
+        indexDocs.write_w2id(self.vocab_ids_path)
+        # Assign the number of words to the BTM object
+        self.w = len(open(self.vocab_ids_path).readlines())
+        print(f"Number of words: {self.w}.")
+
+    def _estimate_btm(self):
+        """Invoke Gibbs BTM posterior inference on the tokenised corpus"""
+
+        ret = s.run([self.btm_exe,
+                     "est",
+                     str(self.t),
+                     str(self.w),
+                     str(self.alpha),
+                     str(self.beta),
+                     str(self.n_iter),
+                     str(self.n_iter),  # Save Step
+                     self.tokenised_btmcorpus_filepath,
+                     self.output_dir
+                     ],
+                    check=True, capture_output=True, text=True)
+        return ret.stdout
+
+    def _infer_btm_pz_d(self):
+        """Invoke Gibbs BTM docs inference on the corpus"""
+
+        ret = s.run([self.btm_exe,
+                     "inf",
+                     self.doc_inf_type,
+                     str(self.t),
+                     self.tokenised_btmcorpus_filepath,
+                     self.output_dir
+                     ],
+                    check=True, capture_output=True, text=True)
+        return ret.stdout
+
+    def infer_btm(self):
+        self._concatenate_docs_into_btmcorpus()
+        self._vectorise_btmcorpus()
+        self._estimate_btm()
+        self._infer_btm_pz_d()
+        print("BTM Built.")
+
+
 def main():
     print("Main thread started..\n")
     folders_path = (r"D:\College\DKEM\Thesis"
@@ -739,4 +842,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    #  main()
+    print("OK, main called. Bravo.")
