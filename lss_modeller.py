@@ -6,6 +6,7 @@ from __future__ import annotations  # To defer evaluation of type hints
 import subprocess as s
 from gensim.corpora import Dictionary, bleicorpus
 from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
 from nltk.util import ngrams
 import time
 import pandas as pd
@@ -15,6 +16,7 @@ from typing import Tuple, List
 from collections import defaultdict
 import seaborn as sns
 from btm import indexDocs
+from langdetect import detect
 sns.set()
 
 
@@ -714,7 +716,7 @@ class LssBTModeller:
                  beta: float,
                  btm_exe_path: str = r"..\BTM-master\src\btm.exe",
                  n_iter: int = 1000,
-                 model_dir_name: str = "BTM",
+                 model_dir_suffix: str = "",
                  doc_inference_type: str = "sum_b"
                  ):
         self.directory_path = directory_path
@@ -727,7 +729,7 @@ class LssBTModeller:
         self.btm_exe = btm_exe_path
         self.doc_inf_type = doc_inference_type
 
-        self.output_dir = f"{directory_path}\\{model_dir_name}\\"
+        self.output_dir = f"{directory_path}\\BTM_{model_dir_suffix}\\"
         self.plain_corpus_path = f"{self.output_dir}btmcorpus.txt"
         self.tokenised_btmcorpus_filepath = (f"{self.output_dir}vectorised\\"
                                              "tokenised_btmcorpus.txt")
@@ -736,7 +738,9 @@ class LssBTModeller:
         Tools.initialise_directories(self.output_dir)
         Tools.initialise_directories(f"{self.output_dir}vectorised")
 
-    def _concatenate_docs_into_btmcorpus(self):
+    def _concatenate_docs_into_btmcorpus(self,
+                                         remove_bgw: bool = False,
+                                         drop_uncommon: bool = False):
         # Read in the plain text files
         plain_documents = []
         with Tools.scan_directory(self.directory_path) as docs:
@@ -755,6 +759,25 @@ class LssBTModeller:
         # lowercase and strip \n away
         plain_documents = [str.replace(d, "\n", "").lower()
                            for d in plain_documents]
+        # it was observed that the topics are composed of a lot of stop words
+        # Following the BTM paper and the observation, we remove these
+        if remove_bgw:
+            # Detect the language
+            lang = detect(" ".join(plain_documents))
+            if lang == "en":
+                lang = "english"
+            elif lang == "nl":
+                lang = "dutch"
+            else:
+                lang = "greek"
+
+            new_documents = []
+            for d in plain_documents:
+                terms = [w for w in word_tokenize(text=d, language=lang)
+                         if w not in set(stopwords.words(lang))]
+                new_documents.append(" ".join(terms))
+            plain_documents = new_documents
+
         # save it to disk
         Tools.save_list_to_text(mylist=plain_documents,
                                 filepath=self.plain_corpus_path)
@@ -766,8 +789,8 @@ class LssBTModeller:
                             self.tokenised_btmcorpus_filepath)
         indexDocs.write_w2id(self.vocab_ids_path)
         # Assign the number of words to the BTM object
-        self.w = len(open(self.vocab_ids_path).readlines())
-        print(f"Number of words: {self.w}.")
+        self.w = len(open(self.vocab_ids_path, mode="r", encoding="utf8"
+                          ).readlines())
 
     def _estimate_btm(self):
         """Invoke Gibbs BTM posterior inference on the tokenised corpus"""
@@ -799,46 +822,90 @@ class LssBTModeller:
                     check=True, capture_output=True, text=True)
         return ret.stdout
 
-    def infer_btm(self):
-        self._concatenate_docs_into_btmcorpus()
+    def infer_btm(self,
+                  remove_bg_terms: bool = False,
+                  drop_uncommon_terms: bool = False):
+        self._concatenate_docs_into_btmcorpus(
+            remove_bgw=remove_bg_terms,
+            drop_uncommon=drop_uncommon_terms)
         self._vectorise_btmcorpus()
         self._estimate_btm()
         self._infer_btm_pz_d()
-        print("BTM Built.")
 
 
 def main():
-    print("Main thread started..\n")
-    folders_path = (r"D:\College\DKEM\Thesis"
-                    r"\AuthorshipClustering\Datasets\pan17_train")
-    hdp = r"D:\College\DKEM\Thesis\AuthorshipClustering\Code\hdps\hdp"
+    # Specify which topic model to use?
+    use_btm = True
 
-    optimiser = LssOptimiser(train_folders_path=folders_path,
-                             hdp_path=hdp,
-                             ldac_filename="dummy_ldac_corpus.dat",
-                             hdp_seed=None,
-                             eta_range=[0.3, 0.5, 0.8, 1],
-                             gamma_range=[0.1, 0.3, 0.5],
-                             alpha_range=[0.1, 0.3, 0.5],
-                             out_dir=r".\\__outputs__",
-                             hdp_iters=1000)
+    if use_btm:
+        #   Control Parameters ###
+        train_phase = True
+        run_btm = True  # If the btm topics are to be (re-)inferred
+        t = 5  # number of btm topics
+        ##########################
 
-#    ret = optimiser.assess_hyper_sampling(verbose=True)
-#    print(ret)
-#
-    ret_eta = optimiser.smart_optimisation(tail_prcnt=0.8,
-                                           skip_factor=5,
-                                           plot_cat="num.tables",
-                                           verbose=True)
-    print(ret_eta)
+        print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
+        print("BTM modelling and authorial clustering")
+        print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
-#    ret_gamma_alpha = optimiser.traverse_gamma_alpha(ps=12)
-#    print(ret_gamma_alpha)
+        if train_phase:
+            r = range(7, 61)
+            dpath = (r"D:\Projects\Authorial_Clustering_Short_Texts_nPTM"
+                     r"\Datasets\pan17_train")
+        else:
+            r = range(1, 121)
+            dpath = (r"D:\Projects\Authorial_Clustering_Short_Texts_nPTM"
+                     r"\Datasets\pan17_test")
 
-#    print("Generating plots...")
-#    optimiser.generate_gibbs_states_plots(f"{optimiser.out_dir}\\gamma_alpha")
+        for ps in r:
+            # Loop over the problemsets
+            ps_path = f"{dpath}\\problem{ps:03d}"
+            print(f"\nProcessing #{ps:03d}:")
+            if run_btm:
+                #   Inferring BTM ###
+                #####################
+                # TODO: avoid creating r BTM objects by delegating ps_path
+                btm = LssBTModeller(directory_path=ps_path,
+                                    t=t,
+                                    alpha=1.0,
+                                    beta=0.01,
+                                    model_dir_suffix="keep_stopwords_uncommon")
+                btm.infer_btm()
+                print("\t→ btm inference done")
+    else:
 
-    print("Done.")
+        print("Main thread started..\n")
+        folders_path = (r"D:\College\DKEM\Thesis"
+                        r"\AuthorshipClustering\Datasets\pan17_train")
+        hdp = r"D:\College\DKEM\Thesis\AuthorshipClustering\Code\hdps\hdp"
+
+        optimiser = LssOptimiser(train_folders_path=folders_path,
+                                 hdp_path=hdp,
+                                 ldac_filename="dummy_ldac_corpus.dat",
+                                 hdp_seed=None,
+                                 eta_range=[0.3, 0.5, 0.8, 1],
+                                 gamma_range=[0.1, 0.3, 0.5],
+                                 alpha_range=[0.1, 0.3, 0.5],
+                                 out_dir=r".\\__outputs__",
+                                 hdp_iters=1000)
+
+    #    ret = optimiser.assess_hyper_sampling(verbose=True)
+    #    print(ret)
+    #
+        ret_eta = optimiser.smart_optimisation(tail_prcnt=0.8,
+                                               skip_factor=5,
+                                               plot_cat="num.tables",
+                                               verbose=True)
+        print(ret_eta)
+
+    #    ret_gamma_alpha = optimiser.traverse_gamma_alpha(ps=12)
+    #    print(ret_gamma_alpha)
+
+    #    print("Generating plots...")
+    #    optimiser.generate_gibbs_states_plots(f"{optimiser.out_dir}\\"
+    #                                          f"gamma_alpha")
+
+        print("Done.")
 
 
 if __name__ == "__main__":

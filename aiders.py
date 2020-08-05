@@ -235,7 +235,7 @@ class Tools:
     @staticmethod
     def save_list_to_text(mylist: list, filepath: str,
                           header: str = None):
-        with open(filepath, 'w') as file_handler:
+        with open(file=filepath, mode='w', encoding="utf8") as file_handler:
             if header:
                 file_handler.write(f"{header}\n{'-'*12}\n")
             for item in mylist:

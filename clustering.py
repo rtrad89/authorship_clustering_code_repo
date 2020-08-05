@@ -87,8 +87,8 @@ class Clusterer:
                 # Estimate k using on L2 normalised data in spherical k-means
                 self.estimated_k = True
         else:
-            print("\nERROR: cannot create class.\n"
-                  "Data must be passed as a dataframe or the likes.\n")
+            raise ValueError("Cannot create class. "
+                  "Data must be passed as a dataframe or the likes.")
 
     def _estimate_k(self, include_bic: bool, include_gap: bool):
         """
