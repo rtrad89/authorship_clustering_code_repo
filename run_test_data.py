@@ -4,12 +4,15 @@ Created on Sun Aug 11 21:54:01 2019
 
 @author: RTRAD
 """
-from lss_modeller import LssHdpModeller
+from lss_modeller import LssHdpModeller, LssBTModeller
 from aiders import Tools
 from clustering import Clusterer
 from typing import List, Dict
 from time import perf_counter as tpc
 import warnings
+from sys import exit
+
+import pandas as pd
 
 warnings.filterwarnings(action="ignore")  # Supress warning for this code file
 train_phase = True  # If True, the "test" folder must contains training data
@@ -17,6 +20,7 @@ include_older_algorithms = True  # False helps to test newly added algorithms
 nbr_competing_methods = 8  # How many methods are examined? For saving results
 # Controlling variable for CBC
 constraints_fraction = 0.12
+use_btm = True
 
 
 class TestApproach:
@@ -69,7 +73,9 @@ class TestApproach:
                                            bim_thresold=None)
 
     def _get_ps_truth(self, ps: int):
-        true_labels_path = (r"..\..\Datasets\pan17_test\truth"
+        folder = "pan17_train" if train_phase else "pan17_test"
+
+        true_labels_path = (f"..\\..\\Datasets\\{folder}\\truth"
                             r"\problem{:03d}\clustering.json"
                             ).format(ps)
         return Tools.load_true_clusters_into_vector(true_labels_path)
@@ -264,7 +270,7 @@ class TestApproach:
             print(f"\n[{(tpc()-start)/60:06.2f}m] Problem Set ► {ps:03d} ◄")
             try:
                 print(f"[{(tpc()-start)/60:06.2f}m]\tVectorising..")
-                plain_docs, bow_rep_docs, lss_rep_docs = tester._vectorise_ps(
+                plain_docs, bow_rep_docs, lss_rep_docs = self._vectorise_ps(
                         ps,
                         infer_lss=infer,
                         hdp_eta=eta,
@@ -276,7 +282,7 @@ class TestApproach:
                 # Begin Clustering Attempts
                 print(f"[{(tpc()-start)/60:06.2f}m]\tClustering..")
                 ground_truth = self._get_ps_truth(ps)
-                ps_res, k_trends = tester._cluster_data(
+                ps_res, k_trends = self._cluster_data(
                     ps, data=lss_rep_docs,
                     ground_truth=ground_truth,
                     desired_k=desired_k)
@@ -290,9 +296,10 @@ class TestApproach:
             print(f"[{(tpc()-start)/60:06.2f}m]\tDone.")
 
         print("» Saving Results ..")
-        path = tester._save_results(
+        folder = "pan17_train" if train_phase else "pan17_test"
+        path = self._save_results(
                 suffix=f"{save_name_suff}_{configuration}",
-                info_path=r"..\..\Datasets\pan17_test\info.json",
+                info_path=f"..\\..\\Datasets\\{folder}\\info.json",
                 results=problemsets_results,
                 k_values=k_vals)
         if (len(failures) != 0):
@@ -306,10 +313,121 @@ class TestApproach:
         return path
 
 
+class BTMTester(TestApproach):
+    def __init__(self,
+                 corpus_path: str,
+                 t: int,
+                 alpha: float,
+                 beta: float,
+                 btm_dir_suffix: str = "keep_stopwords_uncommon"):
+        self.corpus_path = corpus_path
+        self.suffix = btm_dir_suffix
+        self.btm = LssBTModeller(directory_path=corpus_path,
+                                 t=t,
+                                 alpha=alpha,
+                                 beta=beta)
+        self.btm_dir_suffix = btm_dir_suffix
+
+    def _vectorise_ps(self,
+                      ps: int):
+        # Override the function, returning only the LSS representation
+        directory_path = f"{self.corpus_path}\\problem{ps:03d}"
+        pzd_fpath = f"{directory_path}\\BTM_{self.btm_dir_suffix}\\k5.pz_d"
+        try:
+            btm_lss = pd.read_csv(filepath_or_buffer=pzd_fpath,
+                                  delim_whitespace=True,
+                                  header=None)
+
+            if len(self.btm.doc_index) == 0:
+                doc_index = []
+                # We will need to build the index
+                with Tools.scan_directory(directory_path) as docs:
+                    for doc in docs:
+                        if doc.is_dir():
+                            continue
+                        doc_index.append(Tools.get_filename(doc.path))
+                btm_lss.index = doc_index
+            else:
+                btm_lss.index = self.btm.doc_index
+            return btm_lss
+        except FileNotFoundError:
+            return None
+
+    def run_test(self,
+                 save_name_suff="btm",
+                 drop_uncommon=False,
+                 desired_k=None):
+
+        problemsets_results = []
+        kvals = []
+
+        # K is None which means it will be inferred
+        if train_phase:
+            end = 60
+        else:
+            end = 120
+
+        for ps in range(1, 1+end):
+            print(f"Clustering problem {ps:03d}..")
+            # In BTM, all the corpora need to be modelled as LSS
+            # Now we proceed with clustering
+            ground_truth = self._get_ps_truth(ps)
+            lss_rep_docs = self._vectorise_ps(ps)
+            # Normalise the data as they are inherintly directional
+            lss_rep_docs = Tools.normalise_data(lss_rep_docs)
+            # Start the clustering endeavours
+            ps_res, k_trends = self._cluster_data(ps=ps,
+                                                  data=lss_rep_docs,
+                                                  ground_truth=ground_truth,
+                                                  desired_k=None)
+            problemsets_results.append(ps_res)
+            kvals.append(k_trends)
+        # Save the results to disk:
+        print("Saving results..")
+        self._save_results(
+            suffix=f"_btm_{self.btm_dir_suffix}",
+            info_path=f"{self.corpus_path}\\info.json",
+            results=problemsets_results,
+            k_values=kvals)
+        print("Done.")
+
+
 if __name__ == "__main__":
-    tester = TestApproach(hdp_exe_path=r"..\hdps\hdp",
-                          test_corpus_path=r"..\..\Datasets\pan17_test",
-                          sampling_iters=10000)
+
+    ################
+    # BTM ROUTINES #
+    ################
+
+    if use_btm:
+        print("\nBTM ROUTINES")
+        print("▬▬▬▬▬▬▬▬▬▬▬▬")
+        if train_phase:
+            tester = BTMTester(corpus_path=r"..\..\Datasets\pan17_train",
+                               btm_dir_suffix="keep_stopwords_uncommon",
+                               alpha=1.0,
+                               beta=0.01,
+                               t=5)
+        else:
+            tester = BTMTester(corpus_path=r"..\..\Datasets\pan17_test",
+                               btm_dir_suffix="keep_stopwords_uncommon",
+                               alpha=1.0,
+                               beta=0.01,
+                               t=5)
+
+        tester.run_test()
+        exit(0)  # Break the execution so that HDP clustering is not run
+
+    ################
+    # HDP ROUTINES #
+    ################
+    if train_phase:
+        tester = TestApproach(hdp_exe_path=r"..\hdps\hdp",
+                              test_corpus_path=r"..\..\Datasets\pan17_train",
+                              sampling_iters=10000)
+    else:
+        tester = TestApproach(hdp_exe_path=r"..\hdps\hdp",
+                              test_corpus_path=r"..\..\Datasets\pan17_test",
+                              sampling_iters=10000)
 
     print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 

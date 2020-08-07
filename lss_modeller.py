@@ -715,7 +715,7 @@ class LssBTModeller:
                  alpha: float,
                  beta: float,
                  btm_exe_path: str = r"..\BTM-master\src\btm.exe",
-                 n_iter: int = 1000,
+                 n_iter: int = 10000,  # To guarantee convergence
                  model_dir_suffix: str = "",
                  doc_inference_type: str = "sum_b"
                  ):
@@ -729,14 +729,14 @@ class LssBTModeller:
         self.btm_exe = btm_exe_path
         self.doc_inf_type = doc_inference_type
 
-        self.output_dir = f"{directory_path}\\BTM_{model_dir_suffix}\\"
-        self.plain_corpus_path = f"{self.output_dir}btmcorpus.txt"
-        self.tokenised_btmcorpus_filepath = (f"{self.output_dir}vectorised\\"
+        self.output_dir = f"{directory_path}\\BTM_{model_dir_suffix}"
+        self.plain_corpus_path = f"{self.output_dir}\\btmcorpus.txt"
+        self.tokenised_btmcorpus_filepath = (f"{self.output_dir}\\vectorised\\"
                                              "tokenised_btmcorpus.txt")
-        self.vocab_ids_path = f"{self.output_dir}vectorised\\voca_pt"
+        self.vocab_ids_path = f"{self.output_dir}\\vectorised\\voca_pt"
         # Initialise the relevant directories
         Tools.initialise_directories(self.output_dir)
-        Tools.initialise_directories(f"{self.output_dir}vectorised")
+        Tools.initialise_directories(f"{self.output_dir}\\vectorised")
 
     def _concatenate_docs_into_btmcorpus(self,
                                          remove_bgw: bool = False,
@@ -804,7 +804,7 @@ class LssBTModeller:
                      str(self.n_iter),
                      str(self.n_iter),  # Save Step
                      self.tokenised_btmcorpus_filepath,
-                     self.output_dir
+                     f"{self.output_dir}\\"
                      ],
                     check=True, capture_output=True, text=True)
         return ret.stdout
@@ -817,7 +817,7 @@ class LssBTModeller:
                      self.doc_inf_type,
                      str(self.t),
                      self.tokenised_btmcorpus_filepath,
-                     self.output_dir
+                     f"{self.output_dir}\\"
                      ],
                     check=True, capture_output=True, text=True)
         return ret.stdout
@@ -832,6 +832,25 @@ class LssBTModeller:
         self._estimate_btm()
         self._infer_btm_pz_d()
 
+    def load_pz_d_into_df(self):
+        # Load the lss into df
+        pzd_fpath = f"{self.directory_path}k5.pz_d"
+        try:
+            btm_lss = pd.read_csv(filepath_or_buffer=pzd_fpath,
+                                  delim_whitespace=True)
+
+            if not self.doc_index:
+                # We will need to build the index
+                with Tools.scan_directory(self.directory_path) as docs:
+                    for doc in docs:
+                        if doc.is_dir():
+                            continue
+                        self.doc_index.append(Tools.get_filename(doc.path))
+            btm_lss.index = self.doc_index
+            return btm_lss
+        except FileNotFoundError:
+            return None
+
 
 def main():
     # Specify which topic model to use?
@@ -840,7 +859,6 @@ def main():
     if use_btm:
         #   Control Parameters ###
         train_phase = True
-        run_btm = True  # If the btm topics are to be (re-)inferred
         t = 5  # number of btm topics
         ##########################
 
@@ -849,7 +867,7 @@ def main():
         print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
         if train_phase:
-            r = range(7, 61)
+            r = range(1, 2)
             dpath = (r"D:\Projects\Authorial_Clustering_Short_Texts_nPTM"
                      r"\Datasets\pan17_train")
         else:
@@ -861,17 +879,16 @@ def main():
             # Loop over the problemsets
             ps_path = f"{dpath}\\problem{ps:03d}"
             print(f"\nProcessing #{ps:03d}:")
-            if run_btm:
-                #   Inferring BTM ###
-                #####################
-                # TODO: avoid creating r BTM objects by delegating ps_path
-                btm = LssBTModeller(directory_path=ps_path,
-                                    t=t,
-                                    alpha=1.0,
-                                    beta=0.01,
-                                    model_dir_suffix="keep_stopwords_uncommon")
-                btm.infer_btm()
-                print("\t→ btm inference done")
+            #   Inferring BTM ###
+            #####################
+            # TODO: avoid creating r BTM objects by delegating ps_path
+            btm = LssBTModeller(directory_path=ps_path,
+                                t=t,
+                                alpha=1.0,
+                                beta=0.01,
+                                model_dir_suffix="keep_stopwords_uncommon")
+            btm.infer_btm()
+            print("\t→ btm inference done")
     else:
 
         print("Main thread started..\n")
@@ -909,5 +926,5 @@ def main():
 
 
 if __name__ == "__main__":
-    #  main()
-    print("OK, main called. Bravo.")
+    main()
+    print("Execution finished.")
