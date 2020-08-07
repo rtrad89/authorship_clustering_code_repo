@@ -21,6 +21,7 @@ nbr_competing_methods = 8  # How many methods are examined? For saving results
 # Controlling variable for CBC
 constraints_fraction = 0.12
 use_btm = True
+btm_mode_suffix = "remove_stopwords"
 
 
 class TestApproach:
@@ -321,7 +322,6 @@ class BTMTester(TestApproach):
                  beta: float,
                  btm_dir_suffix: str = "keep_stopwords_uncommon"):
         self.corpus_path = corpus_path
-        self.suffix = btm_dir_suffix
         self.btm = LssBTModeller(directory_path=corpus_path,
                                  t=t,
                                  alpha=alpha,
@@ -354,9 +354,9 @@ class BTMTester(TestApproach):
             return None
 
     def run_test(self,
-                 save_name_suff="btm",
                  drop_uncommon=False,
-                 desired_k=None):
+                 desired_k=None,
+                 btm_dir_suffix="remove_stopwords"):
 
         problemsets_results = []
         kvals = []
@@ -403,13 +403,13 @@ if __name__ == "__main__":
         print("▬▬▬▬▬▬▬▬▬▬▬▬")
         if train_phase:
             tester = BTMTester(corpus_path=r"..\..\Datasets\pan17_train",
-                               btm_dir_suffix="keep_stopwords_uncommon",
+                               btm_dir_suffix=btm_mode_suffix,
                                alpha=1.0,
                                beta=0.01,
                                t=5)
         else:
             tester = BTMTester(corpus_path=r"..\..\Datasets\pan17_test",
-                               btm_dir_suffix="keep_stopwords_uncommon",
+                               btm_dir_suffix=btm_mode_suffix,
                                alpha=1.0,
                                beta=0.01,
                                t=5)

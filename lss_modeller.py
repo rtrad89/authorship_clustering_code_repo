@@ -867,7 +867,7 @@ def main():
         print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
         if train_phase:
-            r = range(1, 2)
+            r = range(1, 61)
             dpath = (r"D:\Projects\Authorial_Clustering_Short_Texts_nPTM"
                      r"\Datasets\pan17_train")
         else:
@@ -886,8 +886,8 @@ def main():
                                 t=t,
                                 alpha=1.0,
                                 beta=0.01,
-                                model_dir_suffix="keep_stopwords_uncommon")
-            btm.infer_btm()
+                                model_dir_suffix="remove_stopwords")
+            btm.infer_btm(remove_bg_terms=True)
             print("\t→ btm inference done")
     else:
 
