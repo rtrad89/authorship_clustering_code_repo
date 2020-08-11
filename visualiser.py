@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from aiders import Tools
 from matplotlib.colors import ListedColormap
-from btm import topicDisplay
 
 
 class Visualiser():

@@ -21,7 +21,7 @@ nbr_competing_methods = 8  # How many methods are examined? For saving results
 # Controlling variable for CBC
 constraints_fraction = 0.12
 use_btm = True
-btm_mode_suffix = "remove_stopwords"
+btm_mode_suffix = "remove_stopwords_puncts"
 
 
 class TestApproach:
@@ -331,39 +331,37 @@ class BTMTester(TestApproach):
     def _vectorise_ps(self,
                       ps: int):
         # Override the function, returning only the LSS representation
+        # TODO: replace k10 with k{t}
         directory_path = f"{self.corpus_path}\\problem{ps:03d}"
-        pzd_fpath = f"{directory_path}\\BTM_{self.btm_dir_suffix}\\k5.pz_d"
-        try:
-            btm_lss = pd.read_csv(filepath_or_buffer=pzd_fpath,
-                                  delim_whitespace=True,
-                                  header=None)
+        pzd_fpath = f"{directory_path}\\BTM_{self.btm_dir_suffix}\\k10.pz_d"
 
-            if len(self.btm.doc_index) == 0:
-                doc_index = []
-                # We will need to build the index
-                with Tools.scan_directory(directory_path) as docs:
-                    for doc in docs:
-                        if doc.is_dir():
-                            continue
-                        doc_index.append(Tools.get_filename(doc.path))
-                btm_lss.index = doc_index
-            else:
-                btm_lss.index = self.btm.doc_index
-            return btm_lss
-        except FileNotFoundError:
-            return None
+        btm_lss = pd.read_csv(filepath_or_buffer=pzd_fpath,
+                              delim_whitespace=True,
+                              header=None)
+
+        if len(self.btm.doc_index) == 0:
+            doc_index = []
+            # We will need to build the index
+            with Tools.scan_directory(directory_path) as docs:
+                for doc in docs:
+                    if doc.is_dir():
+                        continue
+                    doc_index.append(Tools.get_filename(doc.path))
+            btm_lss.index = doc_index
+        else:
+            btm_lss.index = self.btm.doc_index
+        return btm_lss
 
     def run_test(self,
                  drop_uncommon=False,
-                 desired_k=None,
-                 btm_dir_suffix="remove_stopwords"):
+                 desired_k=None):
 
         problemsets_results = []
         kvals = []
 
         # K is None which means it will be inferred
         if train_phase:
-            end = 60
+            end = 1
         else:
             end = 120
 
@@ -406,13 +404,13 @@ if __name__ == "__main__":
                                btm_dir_suffix=btm_mode_suffix,
                                alpha=1.0,
                                beta=0.01,
-                               t=5)
+                               t=10)
         else:
             tester = BTMTester(corpus_path=r"..\..\Datasets\pan17_test",
                                btm_dir_suffix=btm_mode_suffix,
                                alpha=1.0,
                                beta=0.01,
-                               t=5)
+                               t=10)
 
         tester.run_test()
         exit(0)  # Break the execution so that HDP clustering is not run

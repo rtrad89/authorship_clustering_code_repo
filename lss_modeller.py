@@ -17,6 +17,7 @@ from collections import defaultdict
 import seaborn as sns
 from btm import indexDocs
 from langdetect import detect
+from re import sub
 sns.set()
 
 
@@ -734,13 +735,11 @@ class LssBTModeller:
         self.tokenised_btmcorpus_filepath = (f"{self.output_dir}\\vectorised\\"
                                              "tokenised_btmcorpus.txt")
         self.vocab_ids_path = f"{self.output_dir}\\vectorised\\voca_pt"
-        # Initialise the relevant directories
-        Tools.initialise_directories(self.output_dir)
-        Tools.initialise_directories(f"{self.output_dir}\\vectorised")
 
     def _concatenate_docs_into_btmcorpus(self,
                                          remove_bgw: bool = False,
-                                         drop_uncommon: bool = False):
+                                         drop_uncommon: bool = False,
+                                         drop_punctuation: bool = False):
         # Read in the plain text files
         plain_documents = []
         with Tools.scan_directory(self.directory_path) as docs:
@@ -778,6 +777,10 @@ class LssBTModeller:
                 new_documents.append(" ".join(terms))
             plain_documents = new_documents
 
+        if drop_punctuation:
+            plain_documents = [sub(pattern=r"[^\w\s]",
+                                   repl="",
+                                   string=d) for d in plain_documents]
         # save it to disk
         Tools.save_list_to_text(mylist=plain_documents,
                                 filepath=self.plain_corpus_path)
@@ -824,10 +827,12 @@ class LssBTModeller:
 
     def infer_btm(self,
                   remove_bg_terms: bool = False,
-                  drop_uncommon_terms: bool = False):
+                  drop_uncommon_terms: bool = False,
+                  drop_puncs: bool = False):
         self._concatenate_docs_into_btmcorpus(
             remove_bgw=remove_bg_terms,
-            drop_uncommon=drop_uncommon_terms)
+            drop_uncommon=drop_uncommon_terms,
+            drop_punctuation=drop_puncs)
         self._vectorise_btmcorpus()
         self._estimate_btm()
         self._infer_btm_pz_d()
@@ -859,7 +864,7 @@ def main():
     if use_btm:
         #   Control Parameters ###
         train_phase = True
-        t = 5  # number of btm topics
+        t = 10  # number of btm topics
         ##########################
 
         print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
@@ -867,7 +872,7 @@ def main():
         print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
 
         if train_phase:
-            r = range(1, 61)
+            r = range(1, 2)
             dpath = (r"D:\Projects\Authorial_Clustering_Short_Texts_nPTM"
                      r"\Datasets\pan17_train")
         else:
@@ -886,8 +891,9 @@ def main():
                                 t=t,
                                 alpha=1.0,
                                 beta=0.01,
-                                model_dir_suffix="remove_stopwords")
-            btm.infer_btm(remove_bg_terms=True)
+                                model_dir_suffix="remove_stopwords_puncts")
+            btm.infer_btm(remove_bg_terms=True,
+                          drop_puncs=True)
             print("\t→ btm inference done")
     else:
 
