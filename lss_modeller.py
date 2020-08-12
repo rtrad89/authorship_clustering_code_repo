@@ -18,6 +18,7 @@ import seaborn as sns
 from btm import indexDocs
 from langdetect import detect
 from re import sub
+from scipy.special import comb
 sns.set()
 
 
@@ -728,7 +729,7 @@ class LssBTModeller:
         self.doc_index = []  # the index of the files read for reference
         self.w = None
         self.btm_exe = btm_exe_path
-        self.doc_inf_type = doc_inference_type
+        self.doc_inf_type = "sum_b"  # Due to later dependant computations
 
         self.output_dir = f"{directory_path}\\BTM_{model_dir_suffix}"
         self.plain_corpus_path = f"{self.output_dir}\\btmcorpus.txt"
@@ -755,6 +756,8 @@ class LssBTModeller:
                     print("Skipped while loading files: {}"
                           .format(doc.name))
                     pass
+                finally:
+                    f.close()
         # lowercase and strip \n away
         plain_documents = [str.replace(d, "\n", "").lower()
                            for d in plain_documents]
@@ -792,8 +795,10 @@ class LssBTModeller:
                             self.tokenised_btmcorpus_filepath)
         indexDocs.write_w2id(self.vocab_ids_path)
         # Assign the number of words to the BTM object
-        self.w = len(open(self.vocab_ids_path, mode="r", encoding="utf8"
-                          ).readlines())
+        f = open(self.vocab_ids_path, mode="r", encoding="utf8")
+        temp = f.readlines()
+        self.w = len(temp)
+        f.close()
 
     def _estimate_btm(self):
         """Invoke Gibbs BTM posterior inference on the tokenised corpus"""
@@ -826,20 +831,53 @@ class LssBTModeller:
         return ret.stdout
 
     def infer_btm(self,
-                  remove_bg_terms: bool = False,
+                  remove_bg_terms: bool,
                   drop_uncommon_terms: bool = False,
-                  drop_puncs: bool = False):
+                  drop_puncs: bool = False,
+                  use_biterm_freqs: bool = False):
         self._concatenate_docs_into_btmcorpus(
             remove_bgw=remove_bg_terms,
             drop_uncommon=drop_uncommon_terms,
             drop_punctuation=drop_puncs)
         self._vectorise_btmcorpus()
         self._estimate_btm()
-        self._infer_btm_pz_d()
+        self._infer_btm_pz_d(use_frequencies=use_biterm_freqs)
 
-    def load_pz_d_into_df(self):
+    @staticmethod
+    def _doc_gen_biterms(doc: List, window: int = 15) -> List:
+        """
+        Replicate the generation of terms by the original C++ implementation
+        Link: https://github.com/xiaohuiyan/BTM/blob/master/src/doc.h#L35
+
+        Parameters
+        ----------
+        doc : List
+            The tokenised document to generate the biterms from.
+        window : int, optional
+            The window whereby biterms are elicited. The default is 15.
+
+        Returns
+        -------
+        List
+            The generated list of biterms.
+
+        """
+        biterms = set()
+        if len(doc) < 2:
+            return None
+        for i, term in enumerate(doc):
+            for j in range(i+1, min(i+window, len(doc))):
+                # Avoid duplication as per the btm description
+                # https://github.com/xiaohuiyan/BTM/issues/10#issuecomment-290132011
+                if (doc[j], doc[i]) not in biterms:
+                    biterms.add((doc[i], doc[j]))
+
+        return biterms
+
+    def load_pz_d_into_df(self,
+                          use_frequencies: bool = False):
         # Load the lss into df
-        pzd_fpath = f"{self.directory_path}k5.pz_d"
+        pzd_fpath = f"{self.directory_path}k{self.t}.pz_d"
         try:
             btm_lss = pd.read_csv(filepath_or_buffer=pzd_fpath,
                                   delim_whitespace=True)
@@ -852,6 +890,25 @@ class LssBTModeller:
                             continue
                         self.doc_index.append(Tools.get_filename(doc.path))
             btm_lss.index = self.doc_index
+
+            if use_frequencies:
+                # The saved documents are in p(z|d) values
+                # We want to proportion them to frequencies so that we have the
+                # frequency of terms belonging to a topic
+                # Since sum_b is used, we will use the count of biterms
+                # Treating each p(zi|dj) as a proportion, we will count biterms
+                with open(self.tokenised_btmcorpus_filepath) as c:
+                    tcorpus = c.readlines()
+                # How many biterms are there?
+                # Analyzing the C++ code, a widnow of 15 is used
+                # Use statistics to count the biterms then
+                freqs = [(len(tdoc)//15)*(comb(N=15, k=2, exact=True))
+                         for tdoc in tcorpus]
+                # FIXME: these counts are exaggerated due to not removing
+                # redundant ones. Need to be done on a case-by-case basis,
+                # so the biterms need to be regenerated!
+                btm_lss = btm_lss.mul(freqs, axis="index")
+
             return btm_lss
         except FileNotFoundError:
             return None
@@ -893,7 +950,8 @@ def main():
                                 beta=0.01,
                                 model_dir_suffix="remove_stopwords_puncts")
             btm.infer_btm(remove_bg_terms=True,
-                          drop_puncs=True)
+                          drop_puncs=True,
+                          use_biterm_freqs=False)
             print("\t→ btm inference done")
     else:
 
