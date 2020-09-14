@@ -18,7 +18,7 @@ import seaborn as sns
 from btm import indexDocs
 from langdetect import detect
 from re import sub
-from scipy.special import comb
+# from scipy.special import comb
 sns.set()
 
 
@@ -264,8 +264,15 @@ class LssHdpModeller:
                    ).format(path))
             raise
 
+    def _convert_to_gensim_corpus(self,
+                                  lss: pd.DataFrame
+                                  ) -> pd.DataFrame:
+        # A topic is a term, and the weight is the count
+        pass
+
     def get_corpus_lss(self, infer_lss,
-                       bim_thresold: int = 0, bim: bool = False
+                       bim_thresold: int = 0,
+                       bim: bool = False
                        ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Get high- and low-dimenstional representations of data.
@@ -843,7 +850,6 @@ class LssBTModeller:
         self._estimate_btm()
         self._infer_btm_pz_d(use_frequencies=use_biterm_freqs)
 
-    @staticmethod
     def _doc_gen_biterms(doc: List, window: int = 15) -> List:
         """
         Replicate the generation of terms by the original C++ implementation
@@ -862,20 +868,33 @@ class LssBTModeller:
             The generated list of biterms.
 
         """
-        biterms = set()
+        biterms = []
         if len(doc) < 2:
             return None
         for i, term in enumerate(doc):
             for j in range(i+1, min(i+window, len(doc))):
-                # Avoid duplication as per the btm description
-                # https://github.com/xiaohuiyan/BTM/issues/10#issuecomment-290132011
-                if (doc[j], doc[i]) not in biterms:
-                    biterms.add((doc[i], doc[j]))
+                # !!! redundancy kept as per the C++ code
+                biterms.append((doc[i], doc[j]))
 
         return biterms
 
     def load_pz_d_into_df(self,
                           use_frequencies: bool = False):
+        """
+
+
+        Parameters
+        ----------
+        use_frequencies : bool, optional
+            DESCRIPTION. The default is False.
+
+        Returns
+        -------
+        btm_lss : TYPE
+            DESCRIPTION.
+
+        """
+        # ??? This function is not used, should be used in tester._vectorise_ps
         # Load the lss into df
         pzd_fpath = f"{self.directory_path}k{self.t}.pz_d"
         try:
@@ -901,12 +920,10 @@ class LssBTModeller:
                     tcorpus = c.readlines()
                 # How many biterms are there?
                 # Analyzing the C++ code, a widnow of 15 is used
-                # Use statistics to count the biterms then
-                freqs = [(len(tdoc)//15)*(comb(N=15, k=2, exact=True))
+                # regenerate the biterms and count as statistics can detect
+                # redundancies in unordered terms:
+                freqs = [len(self._doc_gen_biterms(tdoc))
                          for tdoc in tcorpus]
-                # FIXME: these counts are exaggerated due to not removing
-                # redundant ones. Need to be done on a case-by-case basis,
-                # so the biterms need to be regenerated!
                 btm_lss = btm_lss.mul(freqs, axis="index")
 
             return btm_lss

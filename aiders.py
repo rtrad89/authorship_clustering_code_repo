@@ -16,6 +16,9 @@ from sklearn.preprocessing import normalize
 from scipy.stats import friedmanchisquare
 from scikit_posthocs import posthoc_nemenyi_friedman
 from sys import exit
+from gensim.matutils import Scipy2Corpus
+from gensim.models.logentropy_model import LogEntropyModel
+from gensim.matutils import corpus2csc
 
 
 class Tools:
@@ -242,10 +245,21 @@ class Tools:
                 file_handler.write(f"{item}\n")
 
     @staticmethod
-    def normalise_data(data: List[List]):
+    def normalise_data(data: List[List],
+                       log_e: bool,
+                       normalise_log_e: bool = False):
         # Form a normalised dataframe with the same index
-        return pd.DataFrame(data=normalize(data, norm="l2"),
-                            index=data.index)
+        idx = data.index
+        if log_e:
+            lss_c = Scipy2Corpus(data.values)
+            model = LogEntropyModel(lss_c, normalize=normalise_log_e)
+            # Convert gensims transformed corpus to array corpus for clustering
+            lss = corpus2csc(model[lss_c]).T.toarray()
+            return pd.DataFrame(data=lss,
+                                index=idx)
+        else:
+            return pd.DataFrame(data=normalize(data, norm="l2"),
+                                index=idx)
 
     @staticmethod
     def save_k_vals_as_df(k_vals: List[List],

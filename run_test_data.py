@@ -20,8 +20,9 @@ include_older_algorithms = True  # False helps to test newly added algorithms
 nbr_competing_methods = 8  # How many methods are examined? For saving results
 # Controlling variable for CBC
 constraints_fraction = 0.12
-use_btm = True
-btm_mode_suffix = "remove_stopwords_puncts"
+use_btm = False
+btm_mode_suffix = "trying_log_e"
+log_entropy_w = True  # instead of l2 normalisation, use log-entropy one
 
 
 class TestApproach:
@@ -265,7 +266,7 @@ class TestApproach:
         k_vals = []
         failures = []
         # Detect if we're dealing with the train or test data
-        r = range(1, 121) if not train_phase else range(1, 61)
+        r = range(1, 121) if not train_phase else range(40, 61)
         start = tpc()
         for ps in r:
             print(f"\n[{(tpc()-start)/60:06.2f}m] Problem Set ► {ps:03d} ◄")
@@ -278,7 +279,8 @@ class TestApproach:
                         hdp_gamma_s=gamma,
                         hdp_alpha_s=alpha,
                         drop_uncommon_terms=drop_uncommon)
-                lss_rep_docs = Tools.normalise_data(lss_rep_docs)
+                lss_rep_docs = Tools.normalise_data(lss_rep_docs,
+                                                    log_e=log_entropy_w)
 
                 # Begin Clustering Attempts
                 print(f"[{(tpc()-start)/60:06.2f}m]\tClustering..")
@@ -326,14 +328,45 @@ class BTMTester(TestApproach):
                                  t=t,
                                  alpha=alpha,
                                  beta=beta)
+        self.t = t
         self.btm_dir_suffix = btm_dir_suffix
 
+    def _doc_gen_biterms(self,
+                         doc: List, window: int = 15) -> List:
+        """
+        Replicate the generation of terms by the original C++ implementation
+        Link: https://github.com/xiaohuiyan/BTM/blob/master/src/doc.h#L35
+
+        Parameters
+        ----------
+        doc : List
+            The tokenised document to generate the biterms from.
+        window : int, optional
+            The window whereby biterms are elicited. The default is 15.
+
+        Returns
+        -------
+        List
+            The generated list of biterms.
+
+        """
+        biterms = []
+        if len(doc) < 2:
+            return None
+        for i, term in enumerate(doc):
+            for j in range(i+1, min(i+window, len(doc))):
+                # !!! redundancy kept as per the C++ code
+                biterms.append((doc[i], doc[j]))
+
+        return biterms
+
     def _vectorise_ps(self,
-                      ps: int):
+                      ps: int,
+                      convert_to_proportions: bool):
         # Override the function, returning only the LSS representation
-        # TODO: replace k10 with k{t}
         directory_path = f"{self.corpus_path}\\problem{ps:03d}"
-        pzd_fpath = f"{directory_path}\\BTM_{self.btm_dir_suffix}\\k10.pz_d"
+        pzd_fpath = (f"{directory_path}\\BTM_{self.btm_dir_suffix}"
+                     f"\\k{self.t}.pz_d")
 
         btm_lss = pd.read_csv(filepath_or_buffer=pzd_fpath,
                               delim_whitespace=True,
@@ -350,6 +383,17 @@ class BTMTester(TestApproach):
             btm_lss.index = doc_index
         else:
             btm_lss.index = self.btm.doc_index
+
+        if convert_to_proportions:
+            tokenised_btmcorpus_filepath = (
+                f"{directory_path}\\BTM_{self.btm_dir_suffix}"
+                f"\\vectorised\\tokenised_btmcorpus.txt")
+            with open(tokenised_btmcorpus_filepath) as c:
+                tcorpus = c.readlines()
+                freqs = [len(self._doc_gen_biterms(tdoc))
+                         for tdoc in tcorpus]
+                btm_lss = btm_lss.mul(freqs, axis="index")
+
         return btm_lss
 
     def run_test(self,
@@ -370,7 +414,7 @@ class BTMTester(TestApproach):
             # In BTM, all the corpora need to be modelled as LSS
             # Now we proceed with clustering
             ground_truth = self._get_ps_truth(ps)
-            lss_rep_docs = self._vectorise_ps(ps)
+            lss_rep_docs = self._vectorise_ps(ps, convert_to_proportions=True)
             # Normalise the data as they are inherintly directional
             lss_rep_docs = Tools.normalise_data(lss_rep_docs)
             # Start the clustering endeavours
@@ -404,13 +448,13 @@ if __name__ == "__main__":
                                btm_dir_suffix=btm_mode_suffix,
                                alpha=1.0,
                                beta=0.01,
-                               t=10)
+                               t=5)
         else:
             tester = BTMTester(corpus_path=r"..\..\Datasets\pan17_test",
                                btm_dir_suffix=btm_mode_suffix,
                                alpha=1.0,
                                beta=0.01,
-                               t=10)
+                               t=5)
 
         tester.run_test()
         exit(0)  # Break the execution so that HDP clustering is not run
@@ -418,6 +462,7 @@ if __name__ == "__main__":
     ################
     # HDP ROUTINES #
     ################
+    print("Running HDP-based experiment..")
     if train_phase:
         tester = TestApproach(hdp_exe_path=r"..\hdps\hdp",
                               test_corpus_path=r"..\..\Datasets\pan17_train",
