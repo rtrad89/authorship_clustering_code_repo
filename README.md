@@ -5,3 +5,5 @@ Authorial clustering involves the grouping of documents written by the same auth
 Experiments with 120 collections in three languages and two genres show that the topic-based latent feature space provides a promising level of performance while reducing the dimensionality by a factor of 1500x compared to state-of-the-arts! I also found that while prior knowledge on the precise number of authors (i.e. authorial clusters) does not contribute much to additional quality, little knowledge on constraints in authorial clusters memberships leads to clear performance improvements in front of this difficult task. 
 
 In the end, thorough experimentation with standard metrics indicates that there still remains an ample room for improvement for authorial clustering, especially with shorter texts.
+
+Full paper: [preprint](https://arxiv.org/abs/2011.15038), [peer-reviewed](https://ida2021.org/).
