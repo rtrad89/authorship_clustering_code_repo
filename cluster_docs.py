@@ -12,6 +12,7 @@ from clustering import Clusterer
 from typing import List, Dict
 from collections import defaultdict
 import pandas as pd
+from numpy import unique
 import warnings
 warnings.filterwarnings(action="ignore")  # Supress warning for this code file
 
@@ -52,7 +53,7 @@ def load_lss_representation_into_df(lssr_dirpath,
             # We will need to build the index
             with Tools.scan_directory(input_docs_folderpath) as docs:
                 for doc in docs:
-                    name, ext = Tools.split_path(doc.path)
+                    _, ext = Tools.split_path(doc.path)
                     # Add the file to index if it's a text file only
                     if ext == ".txt":
                         doc_index.append(Tools.get_filename(doc.path))
@@ -69,7 +70,8 @@ def load_lss_representation_into_df(lssr_dirpath,
 
 
 def save_results(results: List[Dict], k_pred: List[List],
-                 out_dir: str, my_suffix: str, my_index: list):
+                 out_dir: str, my_suffix: str, my_index: list,
+                 long_kvals: bool):
     integrated_results = defaultdict(list)
     for r in results:
         if r is None:
@@ -80,9 +82,24 @@ def save_results(results: List[Dict], k_pred: List[List],
     df = pd.DataFrame(data=integrated_results)
     df.index = my_index
 
+    # Convert all internal elements to lista and then make k_vals dataframe
+    df_k_vals = pd.DataFrame(k_pred,
+                             index=my_index, columns=["k_values"])
+    # It make sense to save the values of k estimations in a wide format for
+    # comparisons and maybe RMSE calculation against the ground truth. However,
+    # if the user wants a long format, they can use long_kvals argument
+    if not long_kvals:
+        df_k_vals = df_k_vals.T
+
     timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
+
     df.to_csv(
         path_or_buf=(f"{out_dir}\\{timestamp}_authorial_clustering_results"
+                     f"_{my_suffix}.csv"),
+        index=True)
+
+    df_k_vals.to_csv(
+        path_or_buf=(f"{out_dir}\\{timestamp}_authorial_clustering_kvals"
                      f"_{my_suffix}.csv"),
         index=True)
 
@@ -120,6 +137,7 @@ def main():
                         type=float, default=12)
     parser.add_argument("-suffix", "--results_fname_suffix",
                         type=str, default="")
+    parser.add_argument("-long_k", "--save_kvals_long_df", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     # Parse arguments from sys.args
     args = parser.parse_args()
@@ -155,13 +173,18 @@ def main():
             alg_option=Clusterer.bl_random)
     idx.append("BL_Random")
     res.append(bl_rand_evals)
-    kvals.append(bl_rand_pred)
+    kvals.append(len(unique(bl_rand_pred)))
 
     bl_singleton_pred, bl_singleton_evals = clu_lss.evaluate(
             alg_option=Clusterer.bl_singleton)
     idx.append("BL_Singleton")
     res.append(bl_singleton_evals)
-    kvals.append(bl_singleton_pred)
+    kvals.append(len(unique(bl_singleton_pred)))
+
+    ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
+    idx.append("Ground_Truth")
+    res.append(ntrue_evals)
+    kvals.append(len(unique(ntrue_pred)))
 
     # Clustering algorithms
     norm_spk_pred, norm_spk_evals = clu_lss.evaluate(
@@ -169,7 +192,7 @@ def main():
             param_init="k-means++")
     idx.append("SPKMeans")
     res.append(norm_spk_evals)
-    kvals.append(norm_spk_pred)
+    kvals.append(len(unique(norm_spk_pred)))
 
     logger.info("Spherical KMeans clustering done")
 
@@ -179,14 +202,14 @@ def main():
         param_copkmeans_init="random")
     idx.append("COP_KMeans")
     res.append(cop_kmeans_evals)
-    kvals.append(cop_kmeans_pred)
+    kvals.append(len(unique(cop_kmeans_pred)))
 
     logger.info("Constrained KMeans clustering done")
 
     # Saving results:
     save_results(results=res, k_pred=kvals,
                  out_dir=args.out_dir, my_suffix=args.results_fname_suffix,
-                 my_index=idx)
+                 my_index=idx, long_kvals=args.save_kvals_long_df)
 
     logger.info(f"Execution completed and results saved under {args.out_dir}.")
     logger.shutdown()
