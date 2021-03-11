@@ -8,7 +8,7 @@ model using HDP non-parametric topic model.
 
 from root_logger import logger
 import argparse
-from lss_modeller import LssHdpModeller
+from authorial_clustering.lss_modeller import LssHdpModeller
 
 
 def main():

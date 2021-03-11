@@ -11,7 +11,7 @@ from nltk.util import ngrams
 import time
 import pandas as pd
 from itertools import product
-from aiders import Tools
+from authorial_clustering.aiders import Tools
 from typing import Tuple, List
 from collections import defaultdict
 import seaborn as sns

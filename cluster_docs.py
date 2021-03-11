@@ -7,8 +7,8 @@ Cluster a set of documents whose LSSR has been already built.
 
 from root_logger import logger
 import argparse
-from aiders import Tools
-from clustering import Clusterer
+from authorial_clustering.aiders import Tools
+from authorial_clustering.clustering import Clusterer
 from typing import List, Dict
 from collections import defaultdict
 import pandas as pd
@@ -113,6 +113,12 @@ def main():
 
     # Specify the arguments
     parser.add_argument(
+        "operation_mode",
+        help=("Operation mode of the code: s for single corpus,"
+              " m for multiple corpora where a directory of folders is"
+              " expected as input.")
+        )
+    parser.add_argument(
         "input_docs_folderpath"
         )
     parser.add_argument(
@@ -168,6 +174,7 @@ def main():
     res = []
     kvals = []
 
+    # TODO: Streamline the code over a directory of corpora
     # Baselines
     bl_rand_pred, bl_rand_evals = clu_lss.evaluate(
             alg_option=Clusterer.bl_random)
