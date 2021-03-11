@@ -84,6 +84,10 @@ class Tools:
         return os.path.basename(path)
 
     @staticmethod
+    def split_path(path) -> str:
+        return os.path.splitext(path)
+
+    @staticmethod
     def _read_json_file(path) -> object:
         with open(path, mode='r', encoding='utf8') as json_file:
             json_data = json_file.read()

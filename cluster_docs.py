@@ -9,6 +9,8 @@ from root_logger import logger
 import argparse
 from aiders import Tools
 from clustering import Clusterer
+from typing import List, Dict
+from collections import defaultdict
 import pandas as pd
 import warnings
 warnings.filterwarnings(action="ignore")  # Supress warning for this code file
@@ -50,9 +52,10 @@ def load_lss_representation_into_df(lssr_dirpath,
             # We will need to build the index
             with Tools.scan_directory(input_docs_folderpath) as docs:
                 for doc in docs:
-                    if doc.is_dir():
-                        continue
-                    doc_index.append(Tools.get_filename(doc.path))
+                    name, ext = Tools.split_path(doc.path)
+                    # Add the file to index if it's a text file only
+                    if ext == ".txt":
+                        doc_index.append(Tools.get_filename(doc.path))
             lss_df.index = doc_index
 
         if normalise:
@@ -63,6 +66,25 @@ def load_lss_representation_into_df(lssr_dirpath,
         logger.error(("\nNo LSS precomputed file was found on disk via:\n{}\n"
                       "> Please generate LDA-C corpus and run HDP first...\n"
                       ).format(path))
+
+
+def save_results(results: List[Dict], k_pred: List[List],
+                 out_dir: str, my_suffix: str, my_index: list):
+    integrated_results = defaultdict(list)
+    for r in results:
+        if r is None:
+            continue
+        for k in r.keys():
+            integrated_results[k].append(r[k])
+
+    df = pd.DataFrame(data=integrated_results)
+    df.index = my_index
+
+    timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
+    df.to_csv(
+        path_or_buf=(f"{out_dir}\\{timestamp}_authorial_clustering_results"
+                     f"_{my_suffix}.csv"),
+        index=True)
 
 
 def main():
@@ -86,6 +108,9 @@ def main():
         help=("The JSON ground truth file of the clustering problem, "
               "like PAN-17 format."))
     parser.add_argument(
+        "out_dir",
+        help="The output directory to write the final results to.")
+    parser.add_argument(
         "-k", "--desired_n_clusters",  type=int, default=None,
         help=("The desired k, number of clusters. "
               "By default k will be automatically selected, "
@@ -93,6 +118,8 @@ def main():
     parser.add_argument("-raw", "--use_raw_counts", action="store_true")
     parser.add_argument("-l_percent", "--ml_cl_constraints_percentage",
                         type=float, default=12)
+    parser.add_argument("-suffix", "--results_fname_suffix",
+                        type=str, default="")
     parser.add_argument("-v", "--verbose", action="store_true")
     # Parse arguments from sys.args
     args = parser.parse_args()
@@ -105,6 +132,10 @@ def main():
         lssr_dirpath=args.lssr_dir,
         input_docs_folderpath=args.input_docs_folderpath,
         normalise=not args.use_raw_counts)
+    logger.info("LSSR loaded successfully")
+
+    if args.verbose:
+        logger.info("LSSR:", lssr, "\n")
 
     # Initialise and run the clusterer module
     clu_lss = Clusterer(dtm=lssr,
@@ -115,24 +146,49 @@ def main():
                         metric="cosine",
                         desired_n_clusters=args.desired_n_clusters)
 
+    idx = []
+    res = []
+    kvals = []
+
+    # Baselines
+    bl_rand_pred, bl_rand_evals = clu_lss.evaluate(
+            alg_option=Clusterer.bl_random)
+    idx.append("BL_Random")
+    res.append(bl_rand_evals)
+    kvals.append(bl_rand_pred)
+
+    bl_singleton_pred, bl_singleton_evals = clu_lss.evaluate(
+            alg_option=Clusterer.bl_singleton)
+    idx.append("BL_Singleton")
+    res.append(bl_singleton_evals)
+    kvals.append(bl_singleton_pred)
+
+    # Clustering algorithms
     norm_spk_pred, norm_spk_evals = clu_lss.evaluate(
             alg_option=Clusterer.alg_spherical_k_means,
             param_init="k-means++")
+    idx.append("SPKMeans")
+    res.append(norm_spk_evals)
+    kvals.append(norm_spk_pred)
+
+    logger.info("Spherical KMeans clustering done")
 
     cop_kmeans_pred, cop_kmeans_evals = clu_lss.evaluate(
         alg_option=Clusterer.alg_cop_kmeans,
         param_constraints_size=args.ml_cl_constraints_percentage/100,
         param_copkmeans_init="random")
+    idx.append("COP_KMeans")
+    res.append(cop_kmeans_evals)
+    kvals.append(cop_kmeans_pred)
 
-    # Baselines
-    bl_rand_pred, bl_rand_evals = clu_lss.evaluate(
-            alg_option=Clusterer.bl_random)
-    bl_singleton_pred, bl_singleton_evals = clu_lss.evaluate(
-            alg_option=Clusterer.bl_singleton)
+    logger.info("Constrained KMeans clustering done")
 
-    nhdp_pred, nhdp_evals = clu_lss.eval_cluster_hdp()
-    ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
+    # Saving results:
+    save_results(results=res, k_pred=kvals,
+                 out_dir=args.out_dir, my_suffix=args.results_fname_suffix,
+                 my_index=idx)
 
+    logger.info(f"Execution completed and results saved under {args.out_dir}.")
     logger.shutdown()
 
 
