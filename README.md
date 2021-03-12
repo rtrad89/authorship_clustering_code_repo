@@ -1,9 +1,40 @@
 # Authorial Clustering of Shorter Texts With Non-parametric Topic Models
+This code repository implements the approach presented in the associated [preprint](https://arxiv.org/abs/2011.15038) ([peer-reviewed version coming soon](https://ida2021.org/)) to cluster a corpus of documents by authorship and produce the evaluated clustering on several fronts.
 
-Authorial clustering involves the grouping of documents written by the same author or team of authors without any prior positive examples of an author’s writing style or thematic preferences. For authorial clustering on shorter texts (paragraph-length texts that are typically shorter than conventional documents), the document representation is particularly important: very high-dimensional feature spaces lead to data sparsity and suffer from serious consequences like the curse of dimensionality, while feature selection may lead to information loss. I programmed a high-level framework which utilizes a compact data representation in a latent feature space derived with non-parametric topic modeling. Authorial clusters are identified thereafter in two scenarios: (a) fully unsupervised and (b) semi-supervised where a small number of shorter texts are known to belong to the same author (must-link constraints) or not (cannot-link constraints).
+# Requirements
+The code is developed mainly with Python 3. You can refer to `requirements.txt` file for necessary Python packages in order to run the code. Moreover, in `env.txt` you find the whole `conda` environment for convenience. Please pay special attention to `scikit-learn` version, **which should NOT be newer than 0.22.0** due to compatibility problems with Spherical K-Means implementation (cf. [this relevant issue](https://github.com/jasonlaska/spherecluster/issues/26)).
 
-Experiments with 120 collections in three languages and two genres show that the topic-based latent feature space provides a promising level of performance while reducing the dimensionality by a factor of 1500x compared to state-of-the-arts! I also found that while prior knowledge on the precise number of authors (i.e. authorial clusters) does not contribute much to additional quality, little knowledge on constraints in authorial clusters memberships leads to clear performance improvements in front of this difficult task. 
+Moreover, the code depends on Hierarchical Dirichlet Process -- HDP as implemented in [blei-lab](https://github.com/blei-lab/hdp). The user should have the HDP code compiled properly in order to use it to produce the latent semantic representation of texts, aka. *LSSR*, for clustering.
 
-In the end, thorough experimentation with standard metrics indicates that there still remains an ample room for improvement for authorial clustering, especially with shorter texts.
+Statistical testing was executed in `R` to produce the CD plots presented in the paper, but it is not critical to running the code.
 
-Full paper: [preprint](https://arxiv.org/abs/2011.15038), [peer-reviewed](https://ida2021.org/).
+# Usage
+There is one main entry point to use the code: `cluster_docs.py`, besides an auxiliary entry point: `lssr_docs.py`. As the names suggest, `cluster_docs.py` clusters documents *represented in a LSSR* and `lssr_docs.py` *builds the relevant LSSR from a corpus of documents* using Blei's HDP. Since the first step is to build LSSR, let's explain how to use `lssr_docs.py` first then follow it with `cluster_docs.py`.
+
+## `lssr_docs.py`
+The main input to the code is a corpus of documents, **each in its own text file**, encased in a directory. The code calls `HDP.exe`, provided that is compiled beforehand as explained above, and produces the compatible LSSR. The code is compatible with Windows operating system, and it is only a wrapper for HDP.
+
+The option `-h` details all the parameters and their semantics, and example usages are:
+
+```
+python lssr_docs.py "D:\pancp" "D:\Projects\Authorial_Clustering_Short_Texts_nPTM\Code\hdps\hdp" -iter 5000
+
+python lssr_docs.py -h
+```
+
+If desired, the code can be run similarly within Spyder's IPython console with `%run` command.
+
+The result of the code is a folder named after the hyperparameters of HDP, containing four files. The most important file is `mode-word-assignments.dat`, which shall be utilised to derive LSSR. `state.log` is an auditing log that records the dynamics of execution.
+
+## `cluster_docs.py`
+The main inputs to this code is the LSSR and the ground truth. For the former, Blei's HDP generates four files, but we need only `mode-word-assignments.dat` as input to the clustering algorithm. The code automatically reshapes `mode-word-assignments.dat` data and forms the topic counts of each document in the corpus. The ground truth is expected to be in a `JSON` file, which indicates the correct authorial clusters of the documents. It is used for evaluation purposes. In general, the data formats comply with [Author Clustering 2017](https://pan.webis.de/clef17/pan17-web/author-clustering.html) shared task in PAN @ CLEF 2017; authorship-link ranking is irrelevant though.
+
+The help option `-h` details the parameters and their meanings. Examples:
+
+```
+python cluster_docs.py s D:\pancp D:\pancp\hdp_lss_0.30_0.10_0.10_common_False D:\pancp\truth\clustering.json D:\pancp -k 4
+
+python cluster_docs.py -h
+```
+
+Running the code results in two `CSV` files: `authorial_clustering_results` which exposes different extrinsic and intrinsic clustering evaluation scores given the ground truth, and `authorial_clustering_kvals` which stores the estimations of *k*, the number of authorial clusters and essentially the authors, by the different methods.
