@@ -38,3 +38,7 @@ python cluster_docs.py -h
 ```
 
 Running the code results in two `CSV` files: `authorial_clustering_results` which exposes different extrinsic and intrinsic clustering evaluation scores given the ground truth, and `authorial_clustering_kvals` which stores the estimations of *k* -- the number of authorial clusters and essentially the authors -- selected by the different methods.
+
+----
+
+<small>*This project is licensed under the terms of the MIT license.*</small>
