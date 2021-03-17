@@ -37,4 +37,4 @@ python cluster_docs.py s D:\pancp D:\pancp\hdp_lss_0.30_0.10_0.10_common_False D
 python cluster_docs.py -h
 ```
 
-Running the code results in two `CSV` files: `authorial_clustering_results` which exposes different extrinsic and intrinsic clustering evaluation scores given the ground truth, and `authorial_clustering_kvals` which stores the estimations of *k*, the number of authorial clusters and essentially the authors, by the different methods.
+Running the code results in two `CSV` files: `authorial_clustering_results` which exposes different extrinsic and intrinsic clustering evaluation scores given the ground truth, and `authorial_clustering_kvals` which stores the estimations of *k* -- the number of authorial clusters and essentially the authors -- selected by the different methods.

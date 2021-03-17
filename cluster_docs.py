@@ -5,10 +5,10 @@ Cluster a set of documents whose LSSR has been already built.
 @author: trad
 """
 
-from root_logger import logger
+from src.root_logger import logger
 import argparse
-from authorial_clustering.aiders import Tools
-from authorial_clustering.clustering import Clusterer
+from src.aiders import Tools
+from src.clustering import Clusterer
 from typing import List, Dict
 from collections import defaultdict
 import pandas as pd
@@ -57,6 +57,7 @@ def load_lss_representation_into_df(lssr_dirpath,
                     # Add the file to index if it's a text file only
                     if ext == ".txt":
                         doc_index.append(Tools.get_filename(doc.path))
+            print(lss_df, doc_index)
             lss_df.index = doc_index
 
         if normalise:

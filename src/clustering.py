@@ -24,10 +24,10 @@ import pandas as pd
 import bcubed
 from spherecluster import SphericalKMeans
 from gap_statistic import OptimalK
-from authorial_clustering.gmeans import GMeans
+from bin.gmeans import GMeans
 import random
 from collections import defaultdict
-from authorial_clustering.cop_kmeans import cop_kmeans
+from bin.cop_kmeans import cop_kmeans
 from sys import exit
 
 

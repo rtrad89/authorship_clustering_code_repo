@@ -11,11 +11,11 @@ from nltk.util import ngrams
 import time
 import pandas as pd
 from itertools import product
-from authorial_clustering.aiders import Tools
+from src.aiders import Tools
 from typing import Tuple, List
 from collections import defaultdict
 import seaborn as sns
-from btm import indexDocs
+# from btm import indexDocs
 from langdetect import detect
 from re import sub
 # from scipy.special import comb
@@ -71,7 +71,8 @@ class LssHdpModeller:
         self.doc_index = []  # the index of the files read for reference
         self.verbose = verbose
 
-    def _convert_corpus_to_bow(self):
+    def _convert_corpus_to_bow(self,
+                               file_ext: str = "txt"):
         """
         Convert a directory of text files into a BoW model.
 
@@ -96,7 +97,8 @@ class LssHdpModeller:
         plain_documents = []
         with Tools.scan_directory(self.input_docs_path) as docs:
             for doc in docs:
-                if doc.is_dir():
+                if doc.is_dir() or Tools.split_path(doc.path
+                                                    )[1] != f".{file_ext}":
                     continue
                 try:
                     f = open(doc.path, mode="r", encoding="utf8")

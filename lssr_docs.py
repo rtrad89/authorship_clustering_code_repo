@@ -6,9 +6,9 @@ model using HDP non-parametric topic model.
 @author: trad
 """
 
-from root_logger import logger
+from src.root_logger import logger
 import argparse
-from authorial_clustering.lss_modeller import LssHdpModeller
+from src.lss_modeller import LssHdpModeller
 
 
 def main():
