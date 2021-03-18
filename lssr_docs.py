@@ -80,7 +80,7 @@ def main():
                     single_run(copy_args)
                 except Exception as e:
                     logger.error(f"Processing failed with the message:\n"
-                                 f"{repr(e)}")
+                                 f"{str(e)}")
                     logger.info(f"\t skipping {folder.path}")
                     continue
 

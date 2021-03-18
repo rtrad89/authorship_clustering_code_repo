@@ -59,7 +59,6 @@ def load_lss_representation_into_df(lssr_dirpath,
                     # Add the file to index if it's a text file only
                     if ext == ".txt":
                         doc_index.append(Tools.get_filename(doc.path))
-            print(lss_df, doc_index)
             lss_df.index = doc_index
 
         if normalise:
@@ -74,13 +73,21 @@ def load_lss_representation_into_df(lssr_dirpath,
 
 def save_results(results: List[Dict], k_pred: List[List],
                  out_dir: str, my_suffix: str, my_index: list,
-                 long_kvals: bool):
+                 long_kvals: bool, mode: chr):
     integrated_results = defaultdict(list)
-    for r in results:
-        if r is None:
-            continue
-        for k in r.keys():
-            integrated_results[k].append(r[k])
+
+    if not mode == "m":
+        for r in results:
+            if r is None:
+                continue
+            for k in r.keys():
+                integrated_results[k].append(r[k])
+    else:
+        for r in results:
+            if r is None:
+                continue
+            for k in r.keys():
+                integrated_results[k].extend(r[k])
 
     df = pd.DataFrame(data=integrated_results)
     df.index = my_index
@@ -109,19 +116,23 @@ def save_results(results: List[Dict], k_pred: List[List],
 
 def single_run(args):
     # Load the ground truth for experimentation
-    ground_truth = Tools.load_true_clusters_into_vector(args.ground_truth)
+    ground_truth = Tools.load_true_clusters_into_vector(
+        f"{args.ground_truth}"
+        f"\\{Tools.get_lowest_foldername(args.input_docs_folderpath)}"
+        "\\clustering.json")
 
     # Load and normalise lSSR
     lssr = load_lss_representation_into_df(
-        lssr_dirpath=args.lssr_dir,
+        lssr_dirpath=f"{args.input_docs_folderpath}\\{args.lssr_dir_name}",
         input_docs_folderpath=args.input_docs_folderpath,
         normalise=not args.use_raw_counts)
 
-    if lssr:
+    if not lssr.empty:
         logger.info("LSSR loaded successfully")
     else:
         logger.info("LSSR couldn't be loaded "
-                    "(have you run HDP first and used the correct lssr_dir?)")
+                    "(have you run HDP first "
+                    "and used the correct lssr_dir_name?)")
         sysexit(-1)
 
     if args.verbose:
@@ -136,9 +147,7 @@ def single_run(args):
                         metric="cosine",
                         desired_n_clusters=args.desired_n_clusters)
 
-    idx = []
-    res = []
-    kvals = []
+    idx, res, kvals = [], [], []
 
     # Baselines
     bl_rand_pred, bl_rand_evals = clu_lss.evaluate(
@@ -199,17 +208,14 @@ def main():
         "input_docs_folderpath"
         )
     parser.add_argument(
-        "lssr_dir",
-        help=("The LSSR which resulted from HDP. "
-              "If still not built, you can build it using the other script: "
-              "lssr_doc, which calls hdp.exe implicitly."))
+        "lssr_dir_name",
+        help=("The LSSR folder name which resulted from HDP. "
+              "These are expected to be inside each corpus folder."))
     parser.add_argument(
         "ground_truth",
-        help=("The JSON ground truth file of the clustering problem, "
-              "like PAN-17 format."))
-    parser.add_argument(
-        "out_dir",
-        help="The output directory to write the final results to.")
+        help=("The ground truth folder of the clustering problem(s), "
+              "where there is a folder for each corpus and named identically, "
+              "containing clustering.json files, like PAN-17 dataset."))
     parser.add_argument(
         "-k", "--desired_n_clusters",  type=int, default=None,
         help=("The desired k, number of clusters. "
@@ -226,14 +232,43 @@ def main():
     args = parser.parse_args()
 
     # Execute single run
-    res, kvals, idx = single_run(args)
+    if args.operation_mode != "m":
+        res, kvals, idx = single_run(args)
+    else:
+        copy_args = args
+        res, kvals, idx = [], [], []
+        i = 0
 
+        with Tools.scan_directory(args.input_docs_folderpath) as dirs:
+            for folder in dirs:
+                if not Tools.is_path_dir(folder):
+                    continue
+                copy_args.input_docs_folderpath = folder.path
+                logger.info(f"\n▬▬▬ Clustering \"{folder.path}\" ▬▬▬")
+                try:
+                    single_res, single_kvals, single_idx = single_run(
+                        copy_args)
+                    res.append(single_res)
+                    kvals.append(single_kvals)
+                    i += 1
+                except Exception as e:
+                    logger.error(f"Clustering failed with the message:\n"
+                                 f"{str(e)}")
+                    logger.info(f"\t skipping {folder.path}")
+                    continue
+            # The index of methods shall repeat with each new corpus
+            idx = single_idx * i
+
+    print(res, "\n", kvals, "\n", idx)
     # Saving results:
+    out_dir = f"{args.input_docs_folderpath}\\clustering_results"
+    Tools.initialise_directory(out_dir, purge=False)
     save_results(results=res, k_pred=kvals,
-                 out_dir=args.out_dir, my_suffix=args.results_fname_suffix,
-                 my_index=idx, long_kvals=args.save_kvals_long_df)
+                 out_dir=out_dir, my_suffix=args.results_fname_suffix,
+                 my_index=idx, long_kvals=args.save_kvals_long_df,
+                 mode=args.operation_mode)
 
-    logger.info(f"Execution completed and results saved under {args.out_dir}.")
+    logger.info(f"Execution completed and results saved under {out_dir}.")
     logger.shutdown()
 
 

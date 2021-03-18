@@ -26,7 +26,7 @@ class Tools:
     and processing data"""
 
     @staticmethod
-    def initialise_directory(dir_path):
+    def initialise_directory(dir_path, purge: bool = True):
         """
         Ensure an empty directory is created in `dir_path`.
 
@@ -42,12 +42,14 @@ class Tools:
         """
 
         try:
-            if os.path.exists(dir_path):
+            if purge and os.path.exists(dir_path):
                 rmtree(dir_path)
-            os.mkdir(dir_path)
+            elif not os.path.exists(dir_path):
+                os.mkdir(dir_path)
         except PermissionError:
             print("ERROR: Please make sure the folders required by the program"
                   "are not already opened")
+
 
     @staticmethod
     def remove_directory(dir_path):
@@ -82,6 +84,10 @@ class Tools:
     @staticmethod
     def get_filename(path) -> str:
         return os.path.basename(path)
+
+    @staticmethod
+    def get_lowest_foldername(path) -> str:
+        return os.path.basename(os.path.normpath(path))
 
     @staticmethod
     def split_path(path) -> str:
