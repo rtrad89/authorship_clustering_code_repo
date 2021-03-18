@@ -24,10 +24,10 @@ import pandas as pd
 import bcubed
 from spherecluster import SphericalKMeans
 from gap_statistic import OptimalK
-from bin.gmeans import GMeans
+from .external.gmeans import GMeans
 import random
 from collections import defaultdict
-from bin.cop_kmeans import cop_kmeans
+from .external.cop_kmeans import cop_kmeans
 from sys import exit
 
 

@@ -13,7 +13,9 @@ from typing import List, Dict
 from collections import defaultdict
 import pandas as pd
 from numpy import unique
+from sys import exit as sysexit
 import warnings
+
 warnings.filterwarnings(action="ignore")  # Supress warning for this code file
 
 
@@ -105,6 +107,80 @@ def save_results(results: List[Dict], k_pred: List[List],
         index=True)
 
 
+def single_run(args):
+    # Load the ground truth for experimentation
+    ground_truth = Tools.load_true_clusters_into_vector(args.ground_truth)
+
+    # Load and normalise lSSR
+    lssr = load_lss_representation_into_df(
+        lssr_dirpath=args.lssr_dir,
+        input_docs_folderpath=args.input_docs_folderpath,
+        normalise=not args.use_raw_counts)
+
+    if lssr:
+        logger.info("LSSR loaded successfully")
+    else:
+        logger.info("LSSR couldn't be loaded "
+                    "(have you run HDP first and used the correct lssr_dir?)")
+        sysexit(-1)
+
+    if args.verbose:
+        logger.info("LSSR:", lssr, "\n")
+
+    # Initialise and run the clusterer module
+    clu_lss = Clusterer(dtm=lssr,
+                        true_labels=ground_truth,
+                        max_nbr_clusters=len(lssr)-1,
+                        min_nbr_clusters=1,
+                        min_cluster_size=2,
+                        metric="cosine",
+                        desired_n_clusters=args.desired_n_clusters)
+
+    idx = []
+    res = []
+    kvals = []
+
+    # Baselines
+    bl_rand_pred, bl_rand_evals = clu_lss.evaluate(
+            alg_option=Clusterer.bl_random)
+    idx.append("BL_Random")
+    res.append(bl_rand_evals)
+    kvals.append(len(unique(bl_rand_pred)))
+
+    bl_singleton_pred, bl_singleton_evals = clu_lss.evaluate(
+            alg_option=Clusterer.bl_singleton)
+    idx.append("BL_Singleton")
+    res.append(bl_singleton_evals)
+    kvals.append(len(unique(bl_singleton_pred)))
+
+    ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
+    idx.append("Ground_Truth")
+    res.append(ntrue_evals)
+    kvals.append(len(unique(ntrue_pred)))
+
+    # Clustering algorithms
+    norm_spk_pred, norm_spk_evals = clu_lss.evaluate(
+            alg_option=Clusterer.alg_spherical_k_means,
+            param_init="k-means++")
+    idx.append("SPKMeans")
+    res.append(norm_spk_evals)
+    kvals.append(len(unique(norm_spk_pred)))
+
+    logger.info("Spherical KMeans clustering done")
+
+    cop_kmeans_pred, cop_kmeans_evals = clu_lss.evaluate(
+        alg_option=Clusterer.alg_cop_kmeans,
+        param_constraints_size=args.ml_cl_constraints_percentage/100,
+        param_copkmeans_init="random")
+    idx.append("COP_KMeans")
+    res.append(cop_kmeans_evals)
+    kvals.append(len(unique(cop_kmeans_pred)))
+
+    logger.info("Constrained KMeans clustering done")
+
+    return res, kvals, idx
+
+
 def main():
 
     parser = argparse.ArgumentParser(
@@ -149,70 +225,8 @@ def main():
     # Parse arguments from sys.args
     args = parser.parse_args()
 
-    # Load the ground truth for experimentation
-    ground_truth = Tools.load_true_clusters_into_vector(args.ground_truth)
-
-    # Load and normalise lSSR
-    lssr = load_lss_representation_into_df(
-        lssr_dirpath=args.lssr_dir,
-        input_docs_folderpath=args.input_docs_folderpath,
-        normalise=not args.use_raw_counts)
-    logger.info("LSSR loaded successfully")
-
-    if args.verbose:
-        logger.info("LSSR:", lssr, "\n")
-
-    # Initialise and run the clusterer module
-    clu_lss = Clusterer(dtm=lssr,
-                        true_labels=ground_truth,
-                        max_nbr_clusters=len(lssr)-1,
-                        min_nbr_clusters=1,
-                        min_cluster_size=2,
-                        metric="cosine",
-                        desired_n_clusters=args.desired_n_clusters)
-
-    idx = []
-    res = []
-    kvals = []
-
-    # TODO: Streamline the code over a directory of corpora
-    # Baselines
-    bl_rand_pred, bl_rand_evals = clu_lss.evaluate(
-            alg_option=Clusterer.bl_random)
-    idx.append("BL_Random")
-    res.append(bl_rand_evals)
-    kvals.append(len(unique(bl_rand_pred)))
-
-    bl_singleton_pred, bl_singleton_evals = clu_lss.evaluate(
-            alg_option=Clusterer.bl_singleton)
-    idx.append("BL_Singleton")
-    res.append(bl_singleton_evals)
-    kvals.append(len(unique(bl_singleton_pred)))
-
-    ntrue_pred, ntrue_evals = clu_lss.eval_true_clustering()
-    idx.append("Ground_Truth")
-    res.append(ntrue_evals)
-    kvals.append(len(unique(ntrue_pred)))
-
-    # Clustering algorithms
-    norm_spk_pred, norm_spk_evals = clu_lss.evaluate(
-            alg_option=Clusterer.alg_spherical_k_means,
-            param_init="k-means++")
-    idx.append("SPKMeans")
-    res.append(norm_spk_evals)
-    kvals.append(len(unique(norm_spk_pred)))
-
-    logger.info("Spherical KMeans clustering done")
-
-    cop_kmeans_pred, cop_kmeans_evals = clu_lss.evaluate(
-        alg_option=Clusterer.alg_cop_kmeans,
-        param_constraints_size=args.ml_cl_constraints_percentage/100,
-        param_copkmeans_init="random")
-    idx.append("COP_KMeans")
-    res.append(cop_kmeans_evals)
-    kvals.append(len(unique(cop_kmeans_pred)))
-
-    logger.info("Constrained KMeans clustering done")
+    # Execute single run
+    res, kvals, idx = single_run(args)
 
     # Saving results:
     save_results(results=res, k_pred=kvals,
