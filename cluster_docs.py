@@ -73,7 +73,8 @@ def load_lss_representation_into_df(lssr_dirpath,
 
 def save_results(results: List[Dict], k_pred: List[List],
                  out_dir: str, my_suffix: str, my_index: list, n_corpora: int,
-                 mode: chr):
+                 mode: chr, corpus_names: List[str]):
+
     integrated_results = defaultdict(list)
 
     if not mode == "m":
@@ -90,7 +91,10 @@ def save_results(results: List[Dict], k_pred: List[List],
                 integrated_results[k].extend([r[k]])
 
     df_res = pd.DataFrame(data=integrated_results)
-    df_res.index = my_index*n_corpora
+    # Make a multi-index of corpus name and method name combined:
+    df_res.index = [[name for name in corpus_names
+                     for i in range(len(my_index))],
+                    my_index*n_corpora]
 
     if not mode == "m":
         # Convert all internal elements to lista and then make k_vals dataframe
@@ -185,7 +189,11 @@ def single_run(args):
     res.append(cop_kmeans_evals)
     kvals.append(len(unique(cop_kmeans_pred)))
 
-    logger.info("Constrained KMeans clustering done")
+    fail_flag = all(val is None for val in cop_kmeans_evals.values())
+    logger.info("Constrained KMeans failed to satisfy all constraints at the "
+                "prespecified k. This can happen when an unfit k value is "
+                "entered by users manually using -k option." if fail_flag
+                else "Constrained KMeans clustering done.")
 
     return res, kvals, idx
 
@@ -237,23 +245,22 @@ def main():
     if args.operation_mode != "m":
         res, kvals, idx = single_run(args)
         my_n_corpora = 1
+        my_corpus_names = [Tools.get_lowest_foldername(
+            args.input_docs_folderpath)]
     else:
-        corpus_names, res, kvals, idx = [], [], [], []
+        my_corpus_names, res, kvals, idx = [], [], [], []
         my_n_corpora = 0
-
         with Tools.scan_directory(args.input_docs_folderpath) as dirs:
             for folder in dirs:
-                if my_n_corpora == 5:
-                    break
                 if not Tools.is_path_dir(folder):
                     continue
                 args.input_docs_folderpath = folder.path
                 try:
                     corpus = Tools.get_lowest_foldername(folder.path)
-                    logger.info(f"> Clustering <{corpus}>")
+                    logger.info(f"> Clustering \"{corpus}\"")
                     single_res, single_kvals, idx = single_run(
                         args)
-                    corpus_names.append(corpus)
+                    my_corpus_names.append(corpus)
                     res.extend(single_res)
                     kvals.append(single_kvals)
                     my_n_corpora += 1
@@ -263,11 +270,14 @@ def main():
                     logger.info(f"\t skipping {folder.path}")
                     continue
 
+    # Check if all clustering problems proceeded as desires
+    assert len(res) == my_n_corpora*len(idx), "Some corpora clustering failed!"
+
     # Saving results:
     save_results(results=res, k_pred=kvals,
                  out_dir=out_dir, my_suffix=args.results_fname_suffix,
                  my_index=idx, n_corpora=my_n_corpora,
-                 mode=args.operation_mode)
+                 mode=args.operation_mode, corpus_names=my_corpus_names)
 
     logger.info(f"Execution completed and results saved under {out_dir}.")
     logger.shutdown()

@@ -523,6 +523,22 @@ class Clusterer:
                          data=[set([str(v)]) for v in labels.values]).to_dict()
 
     def _eval_clustering(self, labels_true, labels_predicted):
+        # To address when COP-KMeans fails to satisfy all constraints at a k:
+        if labels_predicted is None:
+            # return an empty dictionary to expose in the final output
+            return {"nmi": None,
+                    "ami": None,
+                    "ari": None,
+                    "fms": None,
+                    "v_measure": None,
+                    "bcubed_precision": None,
+                    "bcubed_recall": None,
+                    "bcubed_fscore": None,
+                    "Silhouette": None,
+                    "Calinski_harabasz": None,
+                    "Davies_Bouldin": None
+                    }
+
         nmi = normalized_mutual_info_score(labels_true,
                                            labels_predicted,
                                            average_method="max")
@@ -675,7 +691,9 @@ class Clusterer:
                 return pred, m_res
 
         else:
-            return None, None
+            # An algorithm failed to cluster, which is COP-KMeans
+            # In this case, return a blank evaluation dictionary
+            return None, self._eval_clustering(None, None)
 
     def eval_cluster_hdp(self):
         predicted = self._hdp_topic_clusters()
