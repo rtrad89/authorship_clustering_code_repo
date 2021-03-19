@@ -72,8 +72,8 @@ def load_lss_representation_into_df(lssr_dirpath,
 
 
 def save_results(results: List[Dict], k_pred: List[List],
-                 out_dir: str, my_suffix: str, my_index: list,
-                 long_kvals: bool, mode: chr):
+                 out_dir: str, my_suffix: str, my_index: list, n_corpora: int,
+                 mode: chr):
     integrated_results = defaultdict(list)
 
     if not mode == "m":
@@ -87,23 +87,23 @@ def save_results(results: List[Dict], k_pred: List[List],
             if r is None:
                 continue
             for k in r.keys():
-                integrated_results[k].extend(r[k])
+                integrated_results[k].extend([r[k]])
 
-    df = pd.DataFrame(data=integrated_results)
-    df.index = my_index
+    df_res = pd.DataFrame(data=integrated_results)
+    df_res.index = my_index*n_corpora
 
-    # Convert all internal elements to lista and then make k_vals dataframe
-    df_k_vals = pd.DataFrame(k_pred,
-                             index=my_index, columns=["k_values"])
-    # It make sense to save the values of k estimations in a wide format for
-    # comparisons and maybe RMSE calculation against the ground truth. However,
-    # if the user wants a long format, they can use long_kvals argument
-    if not long_kvals:
-        df_k_vals = df_k_vals.T
+    if not mode == "m":
+        # Convert all internal elements to lista and then make k_vals dataframe
+        df_k_vals = pd.DataFrame(k_pred, index=my_index,
+                                 columns=["k_estimations"]).T
+    else:
+        df_k_vals = pd.DataFrame(k_pred, columns=my_index)
 
     timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
 
-    df.to_csv(
+    Tools.initialise_directory(out_dir, purge=False)
+
+    df_res.to_csv(
         path_or_buf=(f"{out_dir}\\{timestamp}_authorial_clustering_results"
                      f"_{my_suffix}.csv"),
         index=True)
@@ -226,46 +226,47 @@ def main():
                         type=float, default=12)
     parser.add_argument("-suffix", "--results_fname_suffix",
                         type=str, default="")
-    parser.add_argument("-long_k", "--save_kvals_long_df", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     # Parse arguments from sys.args
     args = parser.parse_args()
 
+    # assemble the output directory
+    out_dir = f"{args.input_docs_folderpath}\\clustering_results"
+
     # Execute single run
     if args.operation_mode != "m":
         res, kvals, idx = single_run(args)
+        my_n_corpora = 1
     else:
-        copy_args = args
-        res, kvals, idx = [], [], []
-        i = 0
+        corpus_names, res, kvals, idx = [], [], [], []
+        my_n_corpora = 0
 
         with Tools.scan_directory(args.input_docs_folderpath) as dirs:
             for folder in dirs:
+                if my_n_corpora == 5:
+                    break
                 if not Tools.is_path_dir(folder):
                     continue
-                copy_args.input_docs_folderpath = folder.path
-                logger.info(f"\n▬▬▬ Clustering \"{folder.path}\" ▬▬▬")
+                args.input_docs_folderpath = folder.path
                 try:
-                    single_res, single_kvals, single_idx = single_run(
-                        copy_args)
-                    res.append(single_res)
+                    corpus = Tools.get_lowest_foldername(folder.path)
+                    logger.info(f"> Clustering <{corpus}>")
+                    single_res, single_kvals, idx = single_run(
+                        args)
+                    corpus_names.append(corpus)
+                    res.extend(single_res)
                     kvals.append(single_kvals)
-                    i += 1
+                    my_n_corpora += 1
                 except Exception as e:
                     logger.error(f"Clustering failed with the message:\n"
                                  f"{str(e)}")
                     logger.info(f"\t skipping {folder.path}")
                     continue
-            # The index of methods shall repeat with each new corpus
-            idx = single_idx * i
 
-    print(res, "\n", kvals, "\n", idx)
     # Saving results:
-    out_dir = f"{args.input_docs_folderpath}\\clustering_results"
-    Tools.initialise_directory(out_dir, purge=False)
     save_results(results=res, k_pred=kvals,
                  out_dir=out_dir, my_suffix=args.results_fname_suffix,
-                 my_index=idx, long_kvals=args.save_kvals_long_df,
+                 my_index=idx, n_corpora=my_n_corpora,
                  mode=args.operation_mode)
 
     logger.info(f"Execution completed and results saved under {out_dir}.")
