@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """
+LSSR modeller controller, which encapsulates all routines to represent a corpus of text files as LSSR via HDP.
 
 """
 from __future__ import annotations  # To defer evaluation of type hints

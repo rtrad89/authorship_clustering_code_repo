@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jul  9 19:25:40 2019
+Clustering controller, where all clustering routines are defined.
 
-@author: RTRAD
 """
 from sklearn.cluster import (MeanShift,
                              AgglomerativeClustering,

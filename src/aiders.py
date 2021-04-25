@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jul  8 16:27:46 2019
+Aiders and functional tools for the execution of the programme.
 
-@author: RTRAD
 """
 import os
 from shutil import rmtree

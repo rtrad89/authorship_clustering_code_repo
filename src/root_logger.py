@@ -3,7 +3,7 @@
 A unified logger for all the modules in the project
 
 The Root logger is a singleton one, which is efficient and
-won't instatiate the logger for each module conveniently
+won't instantiate the logger for each module conveniently
 """
 
 import logging

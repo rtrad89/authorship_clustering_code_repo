@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Aug 19 11:59:09 2019
-A class which caters to visualisation
+A class which caters to visualisation aspects.
 
 @author: RTRAD
 """

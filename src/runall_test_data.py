@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Aug 11 21:54:01 2019
+Run authorial clustering experiments on PAN-17 test dataset.
 
-@author: RTRAD
 """
 from lss_modeller import LssHdpModeller, LssBTModeller
 from aiders import Tools

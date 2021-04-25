@@ -1,3 +1,5 @@
+# Run Friedman-Nemenyi non-parametric post-hoc tests and visualise the results with critical difference diagrams.
+
 # Libraries
 library(readr)
 library(scmamp)
