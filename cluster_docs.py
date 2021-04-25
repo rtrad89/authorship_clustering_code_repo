@@ -202,18 +202,21 @@ def main():
 
     parser = argparse.ArgumentParser(
         description="Cluster a set of documents relying on their LSSR",
-        epilog=("Please refer to the README page of the repository "
+        epilog=("Please refer to the README page of the repository\n"
+                "https://github.com/rtrad89/authorship_clustering_code_repo\n"
                 "and the requirement.txt file in case problems occur."))
 
     # Specify the arguments
     parser.add_argument(
         "operation_mode",
-        help=("Operation mode of the code: s for single corpus,"
-              " m for multiple corpora where a directory of folders is"
-              " expected as input.")
+        help=("Operation mode of the code: s for a single corpus, where a "
+              "folder of text documents is expected; "
+              "m for multiple corpora where a directory of folders of text "
+              "files is expected as input, each folder representing a corpus.")
         )
     parser.add_argument(
-        "input_docs_folderpath"
+        "input_docs_folderpath",
+        help="The directory of the corpus/corpora."
         )
     parser.add_argument(
         "lssr_dir_name",
@@ -227,14 +230,27 @@ def main():
     parser.add_argument(
         "-k", "--desired_n_clusters",  type=int, default=None,
         help=("The desired k, number of clusters. "
-              "By default k will be automatically selected, "
+              "By default, k will be automatically selected, "
               "but you can enter 0 to use the true k."))
-    parser.add_argument("-raw", "--use_raw_counts", action="store_true")
-    parser.add_argument("-l_percent", "--ml_cl_constraints_percentage",
-                        type=float, default=12)
-    parser.add_argument("-suffix", "--results_fname_suffix",
-                        type=str, default="")
-    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument(
+        "-raw", "--use_raw_counts", action="store_true",
+        help=("By default, L2 normalisation will be applied "
+              "to the term frequencies. Specify this "
+              "option to use raw counts instead."))
+    parser.add_argument(
+        "-l_percent", "--ml_cl_constraints_percentage",
+        type=float, default=12,
+        help=("Specify the ML/CL constraint coverage. "
+              "By default it is 12. For more details refer "
+              "to the paper."))
+    parser.add_argument(
+        "-suffix", "--results_fname_suffix",
+        type=str, default="",
+        help=("A suffix for the name of the results file, "
+              "if desired."))
+    parser.add_argument(
+        "-v", "--verbose", action="store_true",
+        help="Specify for verbose outputs.")
     # Parse arguments from sys.args
     args = parser.parse_args()
 
