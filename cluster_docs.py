@@ -37,8 +37,7 @@ def load_lss_representation_into_df(lssr_dirpath,
 
     """
 
-    path = r"{}\mode-word-assignments.dat".format(
-            lssr_dirpath)
+    path = Tools.get_path(lssr_dirpath, "mode-word-assignments.dat")
 
     # We need word counts under each topic, to produce some sort
     # of a bag-of-topics model (BoT)
@@ -109,15 +108,13 @@ def save_results(results: List[Dict], k_pred: List[List],
 
     # Construct the results path
     save_path = Tools.get_path(
-        out_dir, f"{timestamp}_authorial_clustering_results",
-        f"_{my_suffix}.csv")
+        out_dir, f"{timestamp}_authorial_clustering_results_{my_suffix}.csv")
     df_res.to_csv(
         path_or_buf=save_path,
         index=True)
 
     save_path = Tools.get_path(
-        out_dir, f"{timestamp}_authorial_clustering_kvals",
-        f"_{my_suffix}.csv")
+        out_dir, f"{timestamp}_authorial_clustering_kvals_{my_suffix}.csv")
     df_k_vals.to_csv(
         path_or_buf=save_path,
         index=True)
