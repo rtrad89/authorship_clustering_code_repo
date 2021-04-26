@@ -138,15 +138,14 @@ class LssHdpModeller:
         """ Convert a group of files LDA_C corpus and store it on disk"""
         bow_corpus, id2word_map, plain_docs = self._convert_corpus_to_bow()
         # Sterialise into LDA_C and store on disk
-        output_dir = (r"{}\lda_c_format_{:0.1f}_{:0.1f}"
-                      r"_{:0.1f}_common_{}").format(self.input_docs_path,
-                                                    self.hdp_eta,
-                                                    self.hdp_gamma_s,
-                                                    self.hdp_alpha_s,
-                                                    self.drop_uncommon)
+        output_dir = Tools.get_path(
+            self.input_docs_path,
+            f"lda_c_format_{self.hdp_eta:0.1f}_{self.hdp_gamma_s:0.1f}",
+            f"_{self.hdp_alpha_s:0.1f}_common_{self.drop_uncommon}")
+
         Tools.initialise_directory(output_dir)
-        save_location = r"{}\{}.dat".format(
-                output_dir, self.lda_c_fname)
+        save_location = Tools.get_path(
+            output_dir, f"{self.lda_c_fname}.dat")
 
         bleicorpus.BleiCorpus.serialize(
                 fname=save_location, corpus=bow_corpus,
@@ -155,18 +154,17 @@ class LssHdpModeller:
 
     def _invoke_gibbs_hdp(self):
         """Invoke Gibbs hdp posterior inference on the corpus"""
-        path_executable = r"{}\hdp.exe".format(self.hdp_path)
-        param_data = (r"{}\lda_c_format_{:0.1f}_{:0.1f}"
-                      r"_{:0.1f}_common_{}\{}.dat").format(
-                self.input_docs_path,
-                self.hdp_eta,
-                self.hdp_gamma_s,
-                self.hdp_alpha_s,
-                self.drop_uncommon,
-                self.lda_c_fname)
+        path_executable = Tools.get_path(self.hdp_path, "hdp.exe")
 
-        param_directory = r"{}\{}".format(self.input_docs_path,
-                                          self.hdp_output_directory)
+        param_data = Tools.get_path(
+            self.input_docs_path,
+            f"lda_c_format_{self.hdp_eta:0.1f}_{self.hdp_gamma_s:0.1f}",
+            f"_{self.hdp_alpha_s:0.1f}_common_{self.drop_uncommon}",
+            f"{self.lda_c_fname}.dat")
+
+        param_directory = Tools.get_path(
+            self.input_docs_path, self.hdp_output_directory)
+
         # Prepare the output directory
         Tools.initialise_directory(param_directory)
 
@@ -243,9 +241,9 @@ class LssHdpModeller:
 
         """
 
-        path = r"{}\{}\mode-word-assignments.dat".format(
-                self.input_docs_path,
-                self.hdp_output_directory)
+        path = Tools.get_path(
+            self.input_docs_path,
+            self.hdp_output_directory, "mode-word-assignments.dat")
         # We don't need document tables, so we'll skip the relative column,
         # But we do need word counts under each topic, to produce some sort
         # of a bag-of-topics model (BoT)
@@ -377,10 +375,10 @@ class LssOptimiser:
             parameters: normal and hyper.
 
         """
-        path_normal = r"/hdp_lss_HyperFalse/state.log"
-        path_hyper = r"/hdp_lss_HyperTrue/state.log"
-        path_ldac = (r"/lda_c_format_HyperTrue"
-                     r"/dummy_ldac_corpus.dat.vocab")
+        path_normal = Tools.get_path(".","hdp_lss_HyperFalse","state.log")
+        path_hyper = Tools.get_path(".", "hdp_lss_HyperTrue", "state.log")
+        path_ldac = Tools.get_path(".", "lda_c_format_HyperTrue",
+                                   "dummy_ldac_corpus.dat.vocab")
         per_word_ll_normal = []
         per_word_ll_hyper = []
 
@@ -395,9 +393,9 @@ class LssOptimiser:
                 if verbose:
                     print(f"\t► Processing {d.name}")
 
-                normal = f"{d.path}\\{path_normal}"
-                hyper = f"{d.path}\\{path_hyper}"
-                vocab = f"{d.path}\\{path_ldac}"
+                normal = Tools.get_path(d.path, path_normal)
+                hyper = Tools.get_path(d.path, path_hyper)
+                vocab = Tools.get_path(d.path, path_ldac)
 
                 n_words = self._get_number_words(vocab)
                 df_normal = pd.read_csv(filepath_or_buffer=normal,
@@ -434,9 +432,11 @@ class LssOptimiser:
                                skip_factor: int = 1,
                                verbose: bool = False):
         st = time.perf_counter()
-        ldac_path = r"lda_c_format_HyperFalse\\dummy_ldac_corpus.dat"
+        ldac_path = Tools.get_path("lda_c_format_HyperFalse",
+                                   "dummy_ldac_corpus.dat")
         words_nums = {}
-        vocab_file = r"lda_c_format_HyperFalse\\dummy_ldac_corpus.dat.vocab"
+        vocab_file = Tools.get_path("lda_c_format_HyperFalse",
+                                    "dummy_ldac_corpus.dat.vocab")
 #        size = ((60 // skip_factor)
 #                * len(self.etas)
 #                * len(self.gammas)**2
@@ -469,7 +469,8 @@ class LssOptimiser:
                         for a_s in self.alphas:
                             # Cache the number of words for later
                             if folder.name not in words_nums:
-                                vocab_path = f"{folder.path}\\{vocab_file}"
+                                vocab_path = Tools.get_path(
+                                    folder.path, vocab_file)
                                 n_words = self._get_number_words(vocab_path)
                                 words_nums.update({folder.name: n_words})
 
@@ -484,9 +485,9 @@ class LssOptimiser:
                                       f"alpha({a_s:0.2f}, {a_r:0.2f}) "
                                       f"on {folder.name} [{percentage}%]")
 
-                            directory = (f"{self.out_dir}/optimisation"
-                                         f"/{eta:0.1f}__{suff}"
-                                         f"/{folder.name}")
+                            directory = Tools.get_path(
+                                self.out_dir, "optimisation",
+                                f"{eta:0.1f}__{suff}", folder.name)
 
                             if (Tools.path_exists(directory)):
                                 if verbose:
@@ -496,7 +497,7 @@ class LssOptimiser:
 
                             path_executable = r"{}\hdp.exe".format(
                                     self.hdp_path)
-                            data = f"{folder.path}/{ldac_path}"
+                            data = Tools.get_path(folder.path, ldac_path)
 
                             # Prepare the output directory
                             Tools.initialise_directories(directory)
@@ -542,7 +543,7 @@ class LssOptimiser:
                           f"{time.perf_counter() - t:0.1f} seconds ---")
 
         period = round(time.perf_counter() - st, 2)
-        print(f"▬▬▬▬▬ Vectorisation done in {period} seconds ▬▬▬▬▬")
+        print(f"----- Vectorisation done in {period} seconds -----")
         return words_nums
 
     def smart_optimisation(self,
@@ -556,7 +557,7 @@ class LssOptimiser:
 
         ret = {}
         # Loop over the outputs of different etas
-        master_folder = (f"{self.out_dir}\\optimisation")
+        master_folder =  Tools.get_path(self.out_dir, "optimisation")
         log_likelihoods = []
         avg_num_topics = []
         std_num_topics = []
@@ -574,7 +575,8 @@ class LssOptimiser:
                     for problem in problems:
                         try:
                             n_words = words_counts[problem.name]
-                            path_state = f"{problem.path}\\state.log"
+                            path_state = Tools.get_path(problem.path,
+                                                        "state.log")
                             df_state = pd.read_csv(
                                     filepath_or_buffer=path_state,
                                     delim_whitespace=True,
@@ -616,13 +618,16 @@ class LssOptimiser:
                             })
         # Save any encountered errors to disk too
         Tools.save_list_to_text(mylist=errors,
-                                filepath=(f"{self.out_dir}\\optimisation"
-                                          f"\\opt_errors.txt"))
+                                filepath=Tools.get_path(
+                                    self.out_dir, "optimisation",
+                                    "opt_errors.txt"))
 
         pd.DataFrame(data=ret,
                      index=["Log-l", "PwLL", "T-Avg", "T-Std"]
                      ).T.to_csv(
-                             f"{self.out_dir}\\optimisation\\optimisation.csv",
+                             Tools.get_path(self.out_dir,
+                                            "optimisation",
+                                            "optimisation.csv"),
                              index=True)
 
         return ret
@@ -631,15 +636,17 @@ class LssOptimiser:
                              ps: int,
                              tail_prcnt: float = 0.80,
                              verbose: bool = True):
-        ldac_path = r"lda_c_format_HyperFalse\dummy_ldac_corpus.dat"
-        dat_path = f"{self.training_folder}\\problem{ps:03d}\\{ldac_path}"
-        directory = f"{self.out_dir}\\gamma_alpha"
-        path_executable = r"{}\hdp.exe".format(self.hdp_path)
+        ldac_path = Tools.get_path("lda_c_format_HyperFalse",
+                                   "dummy_ldac_corpus.dat")
+        dat_path = Tools.get_path(self.training_folder,
+                                  f"problem{ps:03d}", ldac_path)
+        directory = Tools.get_path(self.out_dir, "gamma_alpha")
+        path_executable = Tools.get_path(self.hdp_path, "hdp.exe")
 
         res = defaultdict(list)
         total_work = len(self.gammas)**2 * len(self.alphas)**2
         c = 0
-        print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
+        print("----------------------------------------------------")
         for g_s, g_r in product(self.gammas, repeat=2):
             for a_s, a_r in product(self.alphas, repeat=2):
                 for a_r in self.alphas:
@@ -654,8 +661,8 @@ class LssOptimiser:
                     s.run([path_executable,
                            "--algorithm",     "train",
                            "--data",          dat_path,
-                           "--directory",   (f"{directory}\\{c:03d}"
-                                             f"hdp_out{suff}"),
+                           "--directory",   Tools.get_path(
+                               directory, f"{c:03d}", f"hdp_out{suff}"),
                            "--max_iter",      str(500),
                            "--sample_hyper",  "no",
                            "--save_lag",      "-1",
@@ -668,8 +675,8 @@ class LssOptimiser:
                           check=True, capture_output=True, text=True)
                     # Read the likelihood
                     ll = pd.read_csv(
-                            (f"{directory}\\{c:03d}hdp_out{suff}"
-                             f"\\state.log"),
+                            Tools.get_path(directory, f"{c:03d}hdp_out{suff}",
+                             "state.log"),
                             delim_whitespace=True
                             ).likelihood.tail(round(tail_prcnt * 500)
                                               ).mean()
@@ -682,16 +689,15 @@ class LssOptimiser:
                     res["likelihood"].append(ll)
         # Save the results to disk
         df_res = pd.DataFrame(res)
-        df_res.to_csv(f"{directory}\\results.csv", index=False)
+        df_res.to_csv(Tools.get_path(directory, "results.csv"), index=False)
         if verbose:
-            print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ Done ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
-#        Tools.remove_directory(f"{directory}\\hdp_out")
+            print("---------------------- Done ------------------------")
         return df_res
 
     def generate_gibbs_states_plots(self,
                                     states_path: str,
                                     cat: str = "likelihood"):
-        new_dir = f"{states_path}\\{cat}_plots"
+        new_dir = Tools.get_path(states_path, f"{cat}_plots")
         if Tools.path_exists(new_dir):
             print("Plots found, skipping..")
             return
@@ -700,7 +706,7 @@ class LssOptimiser:
         with Tools.scan_directory(states_path) as outputs:
             for i, output in enumerate(outputs):
                 try:
-                    state_file = f"{output.path}\\state.log"
+                    state_file = Tools.get_path(output.path, "state.log")
                     df = pd.read_csv(filepath_or_buffer=state_file,
                                      delim_whitespace=True,
                                      index_col="iter")
@@ -709,7 +715,8 @@ class LssOptimiser:
                     name = output.name
                     fig = ax.get_figure()
                     fig.savefig(
-                            f"{states_path}\\{cat}_plots\\{name}.png",
+                            Tools.get_path(states_path,
+                                           f"{cat}_plots", f"{name}.png"),
                             dpi=300,
                             bbox_incehs="tight",
                             format="png")
@@ -717,9 +724,6 @@ class LssOptimiser:
                     print(f"{i}")
                 except FileNotFoundError:
                     print(f"→ Skipping {output.name}")
-
-
-class LssBTModeller:
 
     def __init__(self,
                  directory_path: str,
@@ -933,6 +937,226 @@ class LssBTModeller:
         except FileNotFoundError:
             return None
 
+class LssBTModeller:
+
+    def __init__(self,
+                 directory_path: str,
+                 t: int,
+                 alpha: float,
+                 beta: float,
+                 btm_exe_path: str = Tools.get_path(
+                     "..", "BTM-master", "src", "btm.exe"),
+                 n_iter: int = 10000,  # To guarantee convergence
+                 model_dir_suffix: str = "",
+                 doc_inference_type: str = "sum_b"
+                 ):
+        self.directory_path = directory_path
+        self.t = t
+        self.alpha = alpha
+        self.beta = beta
+        self.n_iter = n_iter
+        self.doc_index = []  # the index of the files read for reference
+        self.w = None
+        self.btm_exe = btm_exe_path
+        self.doc_inf_type = "sum_b"  # Due to later dependant computations
+
+        self.output_dir = Tools.get_path(directory_path,
+                                         f"BTM_{model_dir_suffix}")
+        self.plain_corpus_path = Tools.get_path(self.output_dir,
+                                                "btmcorpus.txt")
+        self.tokenised_btmcorpus_filepath = Tools.get_path(
+            self.output_dir, "vectorised", "tokenised_btmcorpus.txt")
+        self.vocab_ids_path = Tools.get_path(self.output_dir,
+                                             "vectorised", "voca_pt")
+
+    def _concatenate_docs_into_btmcorpus(self,
+                                         remove_bgw: bool = False,
+                                         drop_uncommon: bool = False,
+                                         drop_punctuation: bool = False):
+        # Read in the plain text files
+        plain_documents = []
+        with Tools.scan_directory(self.directory_path) as docs:
+            for doc in docs:
+                if doc.is_dir():
+                    continue
+                try:
+                    f = open(doc.path, mode="r", encoding="utf8")
+                    plain_documents.append(f.read())
+                    self.doc_index.append(Tools.get_filename(doc.path))
+                except PermissionError:
+                    # Raised when trying to open a directory
+                    print("Skipped while loading files: {}"
+                          .format(doc.name))
+                    pass
+                finally:
+                    f.close()
+        # lowercase and strip \n away
+        plain_documents = [str.replace(d, "\n", "").lower()
+                           for d in plain_documents]
+        # it was observed that the topics are composed of a lot of stop words
+        # Following the BTM paper and the observation, we remove these
+        if remove_bgw:
+            # Detect the language
+            lang = detect(" ".join(plain_documents))
+            if lang == "en":
+                lang = "english"
+            elif lang == "nl":
+                lang = "dutch"
+            else:
+                lang = "greek"
+
+            new_documents = []
+            for d in plain_documents:
+                terms = [w for w in word_tokenize(text=d, language=lang)
+                         if w not in set(stopwords.words(lang))]
+                new_documents.append(" ".join(terms))
+            plain_documents = new_documents
+
+        if drop_punctuation:
+            plain_documents = [sub(pattern=r"[^\w\s]",
+                                   repl="",
+                                   string=d) for d in plain_documents]
+        # save it to disk
+        Tools.save_list_to_text(mylist=plain_documents,
+                                filepath=self.plain_corpus_path)
+        return plain_documents
+
+    def _vectorise_btmcorpus(self):
+        # we call routines from indexDocs.py in the BTM repo:
+        # https://github.com/xiaohuiyan/BTM
+        # uncomment if the code file is copied in the project
+        # indexDocs.indexFile(self.plain_corpus_path,
+        #                     self.tokenised_btmcorpus_filepath)
+        # indexDocs.write_w2id(self.vocab_ids_path)
+        # Assign the number of words to the BTM object
+        f = open(self.vocab_ids_path, mode="r", encoding="utf8")
+        temp = f.readlines()
+        self.w = len(temp)
+        f.close()
+
+    def _estimate_btm(self):
+        """Invoke Gibbs BTM posterior inference on the tokenised corpus"""
+
+        ret = s.run([self.btm_exe,
+                     "est",
+                     str(self.t),
+                     str(self.w),
+                     str(self.alpha),
+                     str(self.beta),
+                     str(self.n_iter),
+                     str(self.n_iter),  # Save Step
+                     self.tokenised_btmcorpus_filepath,
+                     Tools.get_path(self.output_dir, "")
+                     ],
+                    check=True, capture_output=True, text=True)
+        return ret.stdout
+
+    def _infer_btm_pz_d(self):
+        """Invoke Gibbs BTM docs inference on the corpus"""
+
+        ret = s.run([self.btm_exe,
+                     "inf",
+                     self.doc_inf_type,
+                     str(self.t),
+                     self.tokenised_btmcorpus_filepath,
+                     Tools.get_path(self.output_dir, "")
+                     ],
+                    check=True, capture_output=True, text=True)
+        return ret.stdout
+
+    def infer_btm(self,
+                  remove_bg_terms: bool,
+                  drop_uncommon_terms: bool = False,
+                  drop_puncs: bool = False,
+                  use_biterm_freqs: bool = False):
+        self._concatenate_docs_into_btmcorpus(
+            remove_bgw=remove_bg_terms,
+            drop_uncommon=drop_uncommon_terms,
+            drop_punctuation=drop_puncs)
+        self._vectorise_btmcorpus()
+        self._estimate_btm()
+        self._infer_btm_pz_d(use_frequencies=use_biterm_freqs)
+
+    def _doc_gen_biterms(doc: List, window: int = 15) -> List:
+        """
+        Replicate the generation of terms by the original C++ implementation
+        Link: https://github.com/xiaohuiyan/BTM/blob/master/src/doc.h#L35
+
+        Parameters
+        ----------
+        doc : List
+            The tokenised document to generate the biterms from.
+        window : int, optional
+            The window whereby biterms are elicited. The default is 15.
+
+        Returns
+        -------
+        List
+            The generated list of biterms.
+
+        """
+        biterms = []
+        if len(doc) < 2:
+            return None
+        for i, term in enumerate(doc):
+            for j in range(i+1, min(i+window, len(doc))):
+                # !!! redundancy kept as per the C++ code
+                biterms.append((doc[i], doc[j]))
+
+        return biterms
+
+    def load_pz_d_into_df(self,
+                          use_frequencies: bool = False):
+        """
+
+
+        Parameters
+        ----------
+        use_frequencies : bool, optional
+            DESCRIPTION. The default is False.
+
+        Returns
+        -------
+        btm_lss : TYPE
+            DESCRIPTION.
+
+        """
+        # ??? This function is not used, should be used in tester._vectorise_ps
+        # Load the lss into df
+        pzd_fpath = f"{self.directory_path}k{self.t}.pz_d"
+        try:
+            btm_lss = pd.read_csv(filepath_or_buffer=pzd_fpath,
+                                  delim_whitespace=True)
+
+            if not self.doc_index:
+                # We will need to build the index
+                with Tools.scan_directory(self.directory_path) as docs:
+                    for doc in docs:
+                        if doc.is_dir():
+                            continue
+                        self.doc_index.append(Tools.get_filename(doc.path))
+            btm_lss.index = self.doc_index
+
+            if use_frequencies:
+                # The saved documents are in p(z|d) values
+                # We want to proportion them to frequencies so that we have the
+                # frequency of terms belonging to a topic
+                # Since sum_b is used, we will use the count of biterms
+                # Treating each p(zi|dj) as a proportion, we will count biterms
+                with open(self.tokenised_btmcorpus_filepath) as c:
+                    tcorpus = c.readlines()
+                # How many biterms are there?
+                # Analyzing the C++ code, a widnow of 15 is used
+                # regenerate the biterms and count as statistics can detect
+                # redundancies in unordered terms:
+                freqs = [len(self._doc_gen_biterms(tdoc))
+                         for tdoc in tcorpus]
+                btm_lss = btm_lss.mul(freqs, axis="index")
+
+            return btm_lss
+        except FileNotFoundError:
+            return None
+
 
 def main():
     # Specify which topic model to use?
@@ -944,13 +1168,13 @@ def main():
         t = 10  # number of btm topics
         ##########################
 
-        print("\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬")
+        print("\n-------------------------------------")
         print("BTM modelling and authorial clustering")
-        print("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n")
+        print("-------------------------------------\n")
 
         if train_phase:
             r = range(1, 2)
-            dpath = (r"D:\Projects\Authorial_Clustering_Short_Texts_nPTM"
+            dpath = Tools.get_path(r"D:\Projects\Authorial_Clustering_Short_Texts_nPTM"
                      r"\Datasets\pan17_train")
         else:
             r = range(1, 121)
@@ -959,7 +1183,7 @@ def main():
 
         for ps in r:
             # Loop over the problemsets
-            ps_path = f"{dpath}\\problem{ps:03d}"
+            ps_path = Tools.get_path(dpath, f"problem{ps:03d}")
             print(f"\nProcessing #{ps:03d}:")
             #   Inferring BTM ###
             #####################
@@ -987,28 +1211,17 @@ def main():
                                  eta_range=[0.3, 0.5, 0.8, 1],
                                  gamma_range=[0.1, 0.3, 0.5],
                                  alpha_range=[0.1, 0.3, 0.5],
-                                 out_dir=r".\\__outputs__",
+                                 out_dir=Tools.get_path(".", "__outputs__"),
                                  hdp_iters=1000)
 
-    #    ret = optimiser.assess_hyper_sampling(verbose=True)
-    #    print(ret)
-    #
         ret_eta = optimiser.smart_optimisation(tail_prcnt=0.8,
                                                skip_factor=5,
                                                plot_cat="num.tables",
                                                verbose=True)
         print(ret_eta)
 
-    #    ret_gamma_alpha = optimiser.traverse_gamma_alpha(ps=12)
-    #    print(ret_gamma_alpha)
-
-    #    print("Generating plots...")
-    #    optimiser.generate_gibbs_states_plots(f"{optimiser.out_dir}\\"
-    #                                          f"gamma_alpha")
 
         print("Done.")
-
-
 if __name__ == "__main__":
     main()
     print("Execution finished.")

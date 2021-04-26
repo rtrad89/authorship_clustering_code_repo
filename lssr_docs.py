@@ -106,7 +106,7 @@ def main():
                 if not Tools.is_path_dir(folder):
                     continue
                 copy_args.input_docs_folderpath = folder.path
-                logger.info(f"\n▬▬▬ Processing \"{folder.path}\" ▬▬▬")
+                logger.info(f"\n Processing \"{folder.path}\" \n")
                 try:
                     single_run(copy_args)
                 except Exception as e:

@@ -107,27 +107,35 @@ def save_results(results: List[Dict], k_pred: List[List],
 
     Tools.initialise_directory(out_dir, purge=False)
 
+    # Construct the results path
+    save_path = Tools.get_path(
+        out_dir, f"{timestamp}_authorial_clustering_results",
+        f"_{my_suffix}.csv")
     df_res.to_csv(
-        path_or_buf=(f"{out_dir}\\{timestamp}_authorial_clustering_results"
-                     f"_{my_suffix}.csv"),
+        path_or_buf=save_path,
         index=True)
 
+    save_path = Tools.get_path(
+        out_dir, f"{timestamp}_authorial_clustering_kvals",
+        f"_{my_suffix}.csv")
     df_k_vals.to_csv(
-        path_or_buf=(f"{out_dir}\\{timestamp}_authorial_clustering_kvals"
-                     f"_{my_suffix}.csv"),
+        path_or_buf=save_path,
         index=True)
 
 
 def single_run(args):
     # Load the ground truth for experimentation
     ground_truth = Tools.load_true_clusters_into_vector(
-        f"{args.ground_truth}"
-        f"\\{Tools.get_lowest_foldername(args.input_docs_folderpath)}"
-        "\\clustering.json")
+        Tools.get_path(
+            args.ground_truth,
+            Tools.get_lowest_foldername(args.input_docs_folderpath),
+            "clustering.json")
+        )
 
     # Load and normalise lSSR
     lssr = load_lss_representation_into_df(
-        lssr_dirpath=f"{args.input_docs_folderpath}\\{args.lssr_dir_name}",
+        lssr_dirpath=Tools.get_path(
+            args.input_docs_folderpath, args.lssr_dir_name),
         input_docs_folderpath=args.input_docs_folderpath,
         normalise=not args.use_raw_counts)
 
@@ -228,10 +236,15 @@ def main():
               "where there is a folder for each corpus and named identically, "
               "containing clustering.json files, like PAN-17 dataset."))
     parser.add_argument(
+        "output_dir",
+        help="The directory where the outputs shall be saved."
+        )
+    parser.add_argument(
         "-k", "--desired_n_clusters",  type=int, default=None,
         help=("The desired k, number of clusters. "
               "By default, k will be automatically selected, "
-              "but you can enter 0 to use the true k."))
+              "but you can enter a value of your choice, "
+              "or 0 to use the true k."))
     parser.add_argument(
         "-raw", "--use_raw_counts", action="store_true",
         help=("By default, L2 normalisation will be applied "
@@ -255,7 +268,7 @@ def main():
     args = parser.parse_args()
 
     # assemble the output directory
-    out_dir = f"{args.input_docs_folderpath}\\clustering_results"
+    out_dir = args.output_dir
 
     # Execute single run
     if args.operation_mode != "m":

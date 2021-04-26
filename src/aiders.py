@@ -25,6 +25,11 @@ class Tools:
     and processing data"""
 
     @staticmethod
+    def get_path(path, *paths):
+        return os.path.join(path, *paths)
+
+
+    @staticmethod
     def initialise_directory(dir_path, purge: bool = True):
         """
         Ensure an empty directory is created in `dir_path`.
@@ -367,7 +372,8 @@ class Tools:
                        ps_range: range):
         k = []
         for ps in ps_range:
-            fp = f"{truth_path}\\problem{ps:03d}\\clustering.json"
+            fp = os.path.join(truth_path, f"problem{ps:03d}",
+                              "clustering.json")
             k.append(len(Tools._read_json_file(fp)))
         return pd.Series(k).describe()
 
@@ -375,7 +381,8 @@ class Tools:
     def get_sota_est_k(output_path: str):
         vals = []
         for ps in range(1, 121):
-            fp = f"{output_path}\\problem{ps:03d}\\clustering.json"
+            fp = os.path.join(output_path, f"problem{ps:03d}",
+                              "clustering.json")
             vals.append(len(Tools._read_json_file(fp)))
         return pd.Series(vals)
 
@@ -385,14 +392,14 @@ class Tools:
         times = []
         # Consume training times
         for ps in range(1, 61):
-            fp = (f"{m_tr_path}\\problem{ps:03d}"
-                  "\\hdp_lss_0.30_0.10_0.10_common_True\\state.log")
+            fp = os.path.join(m_tr_path, f"problem{ps:03d}",
+                  "hdp_lss_0.30_0.10_0.10_common_True","state.log")
             df = pd.read_csv(fp, delim_whitespace=True, usecols=["time"])
             times.append(df.iloc[-1, 0])
         # Consume testing times
         for ps in range(1, 121):
-            fp = (f"{m_te_path}\\problem{ps:03d}"
-                  "\\lss_0.30_0.10_0.10_common_True\\state.log")
+            fp = os.path.join(m_te_path,f"problem{ps:03d}",
+                  "lss_0.30_0.10_0.10_common_True","state.log")
             df = pd.read_csv(fp, delim_whitespace=True, usecols=["time"])
             times.append(df.iloc[-1, 0])
 
