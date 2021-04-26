@@ -2,7 +2,7 @@
 This code repository implements the approach presented in the associated [paper](https://www.springerprofessional.de/en/a-framework-for-authorial-clustering-of-shorter-texts-in-latent-/19058742) ([preprint here](https://arxiv.org/abs/2011.15038)) to cluster a corpus of documents by authorship and produce the evaluated clustering on several fronts.
 
 # Requirements
-The code is developed mainly with Python 3. You can refer to `requirements.txt` file for necessary Python packages in order to run the code. Moreover, in `env.txt` you find the whole `conda` environment for convenience. Please pay special attention to `scikit-learn` version, **which should NOT be newer than 0.22.0** due to compatibility problems with Spherical K-Means implementation (cf. [this relevant issue](https://github.com/jasonlaska/spherecluster/issues/26)).
+The code is developed mainly with Python 3. You can refer to `requirements.txt` file for necessary Python packages in order to run the code. Moreover, in `env.txt` you find the whole `conda` environment for convenience. Please pay special attention to `scikit-learn` version, **which should NOT be newer than 0.22.1** due to compatibility problems with Spherical K-Means implementation (cf. [this relevant issue](https://github.com/jasonlaska/spherecluster/issues/26)).
 
 Moreover, the code depends on Hierarchical Dirichlet Process -- HDP as implemented in [blei-lab](https://github.com/blei-lab/hdp). The user should have the HDP code compiled properly in order to use it to produce the latent semantic representation of texts, aka. *LSSR*, for clustering.
 
