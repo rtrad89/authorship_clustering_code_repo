@@ -1,3 +1,7 @@
+# =============================================================================
+# Source: https://github.com/Behrouz-Babaki/COP-Kmeans
+# =============================================================================
+
 # -*- coding: utf-8 -*-
 import random
 
@@ -200,4 +204,3 @@ def transitive_closure(ml, cl, n):
                 raise Exception('inconsistent constraints between %d and %d' %(i, j))
 
     return ml_graph, cl_graph
-

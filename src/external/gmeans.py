@@ -1,3 +1,8 @@
+# =============================================================================
+# Source: https://github.com/flylo/g-means
+# Minor enhancements may have been applied to this version.
+# =============================================================================
+
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -133,5 +138,3 @@ if __name__ == '__main__':
 	sbn.lmplot(x='x', y='y', data=plot_data, hue='labels_km', fit_reg=False)
 	plt.show()
 	set_trace()
-
-
