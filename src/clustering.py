@@ -6,7 +6,7 @@ Clustering controller, where all clustering routines are defined.
 from sklearn.cluster import (MeanShift,
                              AgglomerativeClustering,
                              OPTICS, cluster_optics_dbscan)
-import hdbscan
+# import hdbscan
 from pyclustering.cluster.xmeans import xmeans
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
 from sklearn.metrics.cluster import (adjusted_mutual_info_score,
@@ -21,7 +21,7 @@ from typing import List, Dict, Set
 from numpy import place, column_stack, unique, inf, arange, errstate
 import pandas as pd
 import bcubed
-from spherecluster import SphericalKMeans
+from .external.spherical_kmeans import SphericalKMeans # Explicitly patched
 from gap_statistic import OptimalK
 from .external.gmeans import GMeans
 import random
@@ -149,33 +149,35 @@ class Clusterer:
     def _cluster_mean_shift(self):
         return MeanShift().fit_predict(self.data)
 
-    def _cluster_hdbscan(self):
-        """
-        Perform density based hierarchical DBSCAN
-
-        Returns
-        -------
-        result : numpy.ndarray
-            The clustering in an array, where first entry corresponds to first
-            document in self.data
-
-        .. _Documentation:
-            https://github.com/scikit-learn-contrib/hdbscan
-
-        """
-        # Initialise HDBSCAN, using generic algorithms to allow for cosine
-        # distances (due to technical incompatability with sklearn). Also the
-        # min_samples is set to 1 because we want to declare as few points to
-        # be noise as possible
-        clusterer = hdbscan.HDBSCAN(min_cluster_size=self.min_clu_size,
-                                    metric=self.distance_metric,
-                                    min_samples=1,
-                                    algorithm="generic")
-        result = clusterer.fit_predict(self.data)
-        # Since HDBSCAN discards noisy docs, we will convert them into
-        # singleton clusters
-
-        return self._process_noise_as_singletons(result=result)
+# =============================================================================
+#     def _cluster_hdbscan(self):
+#         """
+#         Perform density based hierarchical DBSCAN
+#
+#         Returns
+#         -------
+#         result : numpy.ndarray
+#             The clustering in an array, where first entry corresponds to first
+#             document in self.data
+#
+#         .. _Documentation:
+#             https://github.com/scikit-learn-contrib/hdbscan
+#
+#         """
+#         # Initialise HDBSCAN, using generic algorithms to allow for cosine
+#         # distances (due to technical incompatability with sklearn). Also the
+#         # min_samples is set to 1 because we want to declare as few points to
+#         # be noise as possible
+#         clusterer = hdbscan.HDBSCAN(min_cluster_size=self.min_clu_size,
+#                                     metric=self.distance_metric,
+#                                     min_samples=1,
+#                                     algorithm="generic")
+#         result = clusterer.fit_predict(self.data)
+#         # Since HDBSCAN discards noisy docs, we will convert them into
+#         # singleton clusters
+#
+#         return self._process_noise_as_singletons(result=result)
+# =============================================================================
 
     def _process_xmeans_output(self, clustering: List[List]) -> list:
         """Convert the list of lists that xmeans output to a indexed list"""
@@ -623,8 +625,10 @@ class Clusterer:
                     initialisation=param_copkmeans_init,
                     random_const=param_copkmeans_random_constraints)
 
-        elif alg_option == Clusterer.alg_h_dbscan:
-            clustering_labels = self._cluster_hdbscan()
+# =============================================================================
+#         elif alg_option == Clusterer.alg_h_dbscan:
+#             clustering_labels = self._cluster_hdbscan()
+# =============================================================================
 
         elif alg_option == Clusterer.alg_hac:
             clustering_labels = self._cluster_hac(
