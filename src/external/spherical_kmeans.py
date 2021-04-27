@@ -3,7 +3,7 @@
 # The compatibility of the code with scikit-learn 0.22.0 is enhanced,
 # cf. https://github.com/jasonlaska/spherecluster/issues/22;
 # The next release should fix the issue, but currently this is a workaround.
-# All credit belongs to jasonlaska.
+# All credits belong to jasonlaska.
 # =============================================================================
 
 import warnings
