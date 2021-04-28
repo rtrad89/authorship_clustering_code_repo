@@ -6,7 +6,6 @@ Clustering controller, where all clustering routines are defined.
 from sklearn.cluster import (MeanShift,
                              AgglomerativeClustering,
                              OPTICS, cluster_optics_dbscan)
-# import hdbscan
 from pyclustering.cluster.xmeans import xmeans
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
 from sklearn.metrics.cluster import (adjusted_mutual_info_score,

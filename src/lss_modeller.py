@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-LSSR modeller controller, which encapsulates all routines to represent a corpus of text files as LSSR via HDP.
+LSSR modeller controller, which encapsulates all routines to represent a
+    corpus of text files as LSSR via HDP.
 
 """
 from __future__ import annotations  # To defer evaluation of type hints
@@ -12,14 +13,13 @@ from nltk.util import ngrams
 import time
 import pandas as pd
 from itertools import product
-from src.aiders import Tools
+from aiders import Tools
 from typing import Tuple, List
 from collections import defaultdict
 import seaborn as sns
-# from btm import indexDocs
 from langdetect import detect
 from re import sub
-# from scipy.special import comb
+from .external.btm import indexDocs
 sns.set()
 
 
@@ -375,7 +375,7 @@ class LssOptimiser:
             parameters: normal and hyper.
 
         """
-        path_normal = Tools.get_path(".","hdp_lss_HyperFalse","state.log")
+        path_normal = Tools.get_path(".", "hdp_lss_HyperFalse", "state.log")
         path_hyper = Tools.get_path(".", "hdp_lss_HyperTrue", "state.log")
         path_ldac = Tools.get_path(".", "lda_c_format_HyperTrue",
                                    "dummy_ldac_corpus.dat.vocab")
@@ -557,7 +557,7 @@ class LssOptimiser:
 
         ret = {}
         # Loop over the outputs of different etas
-        master_folder =  Tools.get_path(self.out_dir, "optimisation")
+        master_folder = Tools.get_path(self.out_dir, "optimisation")
         log_likelihoods = []
         avg_num_topics = []
         std_num_topics = []
@@ -675,8 +675,9 @@ class LssOptimiser:
                           check=True, capture_output=True, text=True)
                     # Read the likelihood
                     ll = pd.read_csv(
-                            Tools.get_path(directory, f"{c:03d}hdp_out{suff}",
-                             "state.log"),
+                            Tools.get_path(
+                                directory, f"{c:03d}hdp_out{suff}",
+                                "state.log"),
                             delim_whitespace=True
                             ).likelihood.tail(round(tail_prcnt * 500)
                                               ).mean()
@@ -724,32 +725,6 @@ class LssOptimiser:
                     print(f"{i}")
                 except FileNotFoundError:
                     print(f"→ Skipping {output.name}")
-
-    def __init__(self,
-                 directory_path: str,
-                 t: int,
-                 alpha: float,
-                 beta: float,
-                 btm_exe_path: str = r"..\BTM-master\src\btm.exe",
-                 n_iter: int = 10000,  # To guarantee convergence
-                 model_dir_suffix: str = "",
-                 doc_inference_type: str = "sum_b"
-                 ):
-        self.directory_path = directory_path
-        self.t = t
-        self.alpha = alpha
-        self.beta = beta
-        self.n_iter = n_iter
-        self.doc_index = []  # the index of the files read for reference
-        self.w = None
-        self.btm_exe = btm_exe_path
-        self.doc_inf_type = "sum_b"  # Due to later dependant computations
-
-        self.output_dir = f"{directory_path}\\BTM_{model_dir_suffix}"
-        self.plain_corpus_path = f"{self.output_dir}\\btmcorpus.txt"
-        self.tokenised_btmcorpus_filepath = (f"{self.output_dir}\\vectorised\\"
-                                             "tokenised_btmcorpus.txt")
-        self.vocab_ids_path = f"{self.output_dir}\\vectorised\\voca_pt"
 
     def _concatenate_docs_into_btmcorpus(self,
                                          remove_bgw: bool = False,
@@ -937,8 +912,9 @@ class LssOptimiser:
         except FileNotFoundError:
             return None
 
-class LssBTModeller:
 
+class LssBTModeller:
+    # Biterm trial class
     def __init__(self,
                  directory_path: str,
                  t: int,
@@ -1174,8 +1150,9 @@ def main():
 
         if train_phase:
             r = range(1, 2)
-            dpath = Tools.get_path(r"D:\Projects\Authorial_Clustering_Short_Texts_nPTM"
-                     r"\Datasets\pan17_train")
+            dpath = Tools.get_path(
+                r"D:\Projects\Authorial_Clustering_Short_Texts_nPTM"
+                r"\Datasets\pan17_train")
         else:
             r = range(1, 121)
             dpath = (r"D:\Projects\Authorial_Clustering_Short_Texts_nPTM"
@@ -1219,9 +1196,9 @@ def main():
                                                plot_cat="num.tables",
                                                verbose=True)
         print(ret_eta)
-
-
         print("Done.")
+
+
 if __name__ == "__main__":
-    main()
+    # main()
     print("Execution finished.")

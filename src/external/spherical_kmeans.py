@@ -1,3 +1,5 @@
+#coding=utf-8
+
 # =============================================================================
 # This is the development version of the code on https://github.com/jasonlaska
 # The compatibility of the code with scikit-learn 0.22.0 is enhanced,

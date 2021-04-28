@@ -1,3 +1,5 @@
+#coding=utf-8
+
 # =============================================================================
 # Source: https://github.com/flylo/g-means
 # Minor enhancements may have been applied to this version.

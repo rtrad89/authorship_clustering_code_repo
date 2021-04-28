@@ -1,8 +1,9 @@
+# -*- coding: utf-8 -*-
+
 # =============================================================================
 # Source: https://github.com/Behrouz-Babaki/COP-Kmeans
 # =============================================================================
 
-# -*- coding: utf-8 -*-
 import random
 
 def cop_kmeans(dataset, k, ml=[], cl=[],

@@ -45,6 +45,37 @@ python cluster_docs.py -h
 
 Running the code results in two `CSV` files: `authorial_clustering_results` which exposes different extrinsic and intrinsic clustering evaluation scores given the ground truth, and `authorial_clustering_kvals` which stores the estimations of *k* -- the number of authorial clusters and essentially the authors -- selected by the different methods.
 
+### Example
+Running the code with the sample data provided under `example/data/corpora` with the associated metadata under `example/data/meta` should produce similar results to the ones under `example/results`. The sample data is taken from [PAN17-Clustering](https://pan.webis.de/data.html?q=pan17) training data set and all credits belong to Potthast et al. The call (on Windows) and output messages are:
+
+```
+python cluster_docs.py m ./example/data/corpora hdp_lss_0.30_0.10_0.10_common_True ./example/data/meta/truth ./example/results
+
+[INFO]: > Clustering "problem001"
+[INFO]: NumExpr defaulting to 8 threads.
+[INFO]: LSSR loaded successfully
+[INFO]: Spherical KMeans clustering done
+[INFO]: Constrained KMeans clustering done.
+[INFO]: > Clustering "problem002"
+[INFO]: LSSR loaded successfully
+[INFO]: Spherical KMeans clustering done
+[INFO]: Constrained KMeans clustering done.
+[INFO]: > Clustering "problem003"
+[INFO]: LSSR loaded successfully
+[INFO]: Spherical KMeans clustering done
+[INFO]: Constrained KMeans clustering done.
+[INFO]: > Clustering "problem004"
+[INFO]: LSSR loaded successfully
+[INFO]: Spherical KMeans clustering done
+[INFO]: Constrained KMeans clustering done.
+[INFO]: > Clustering "problem005"
+[INFO]: LSSR loaded successfully
+[INFO]: Spherical KMeans clustering done
+[INFO]: Constrained KMeans clustering done.
+[INFO]: > Clustering "truth"
+[INFO]: Execution completed and results saved under ./example/results.
+```
+
 ----
 
 <small>*This project is licensed under the terms of the MIT license.*</small>
