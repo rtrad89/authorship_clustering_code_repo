@@ -8,6 +8,8 @@ Moreover, the code depends on Hierarchical Dirichlet Process -- HDP as implement
 
 Statistical testing was executed in `R` to produce the CD plots presented in the paper, but it is not critical to running the code.
 
+As a final note, the code was developed and run on Windows 10. Slight differences in some results can occur from machine to machine depending on the hardware and software configurations, especially that we use a lot of floating-point calculations in our code.
+
 # Usage
 There is one main entry point to use the code: `cluster_docs.py`, besides an auxiliary entry point: `lssr_docs.py`. As the names suggest, `cluster_docs.py` clusters documents *represented in a LSSR* and `lssr_docs.py` *builds the relevant LSSR from a corpus of documents* using Blei's HDP. Since the first step is to build LSSR, let's explain how to use `lssr_docs.py` first then follow it with `cluster_docs.py`.
 

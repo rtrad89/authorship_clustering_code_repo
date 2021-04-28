@@ -18,10 +18,10 @@ from sklearn.metrics.cluster import (adjusted_mutual_info_score,
                                      calinski_harabasz_score,
                                      davies_bouldin_score)
 from typing import List, Dict, Set
-from numpy import place, column_stack, unique, inf, arange, errstate
+from numpy import place, column_stack, unique, inf, arange
 import pandas as pd
 import bcubed
-from .external.spherical_kmeans import SphericalKMeans # Explicitly patched
+from .external.spherical_kmeans import SphericalKMeans  # Explicitly patched
 from gap_statistic import OptimalK
 from .external.gmeans import GMeans
 import random
@@ -106,16 +106,14 @@ class Clusterer:
         k_gaussian = len(unique(gmeans.labels_))
 
         if include_gap:
-            # silence numpy.log(0) warning when dispersion = 0
-            with errstate(divide='ignore'):
-                # Define a custom clusterer for the Gap statistic
-                def ms(X, k):
-                    c = MeanShift()
-                    c.fit(X)
-                    return c.cluster_centers_, c.predict(X)
-                gap = OptimalK(clusterer=ms)
-                k_gap = gap(X=self.data,
-                            cluster_array=range(2, len(self.data)-1))
+            # Define a custom clusterer for the Gap statistic
+            def ms(X, k):
+                c = MeanShift()
+                c.fit(X)
+                return c.cluster_centers_, c.predict(X)
+            gap = OptimalK(clusterer=ms)
+            k_gap = gap(X=self.data,
+                        cluster_array=range(2, len(self.data)-1))
 
             if include_bic:
                 k_bic = len(unique(self._cluster_xmeans()))
@@ -157,8 +155,8 @@ class Clusterer:
 #         Returns
 #         -------
 #         result : numpy.ndarray
-#             The clustering in an array, where first entry corresponds to first
-#             document in self.data
+#           The clustering in an array, where first entry corresponds to first
+#           document in self.data
 #
 #         .. _Documentation:
 #             https://github.com/scikit-learn-contrib/hdbscan

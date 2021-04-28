@@ -96,7 +96,7 @@ def save_results(results: List[Dict], k_pred: List[List],
                     my_index*n_corpora]
 
     if not mode == "m":
-        # Convert all internal elements to lista and then make k_vals dataframe
+        # Convert all internal elements to lists and then make k_vals dataframe
         df_k_vals = pd.DataFrame(k_pred, index=my_index,
                                  columns=["k_estimations"]).T
     else:
@@ -241,7 +241,7 @@ def main():
         help=("The desired k, number of clusters. "
               "By default, k will be automatically selected, "
               "but you can enter a value of your choice, "
-              "or 0 to use the true k."))
+              "or 0 to try use the true k if possible."))
     parser.add_argument(
         "-raw", "--use_raw_counts", action="store_true",
         help=("By default, L2 normalisation will be applied "
@@ -296,7 +296,7 @@ def main():
                     logger.info(f"\t skipping {folder.path}")
                     continue
 
-    # Check if all clustering problems proceeded as desires
+    # Check if all clustering problems proceeded as desired
     assert len(res) == my_n_corpora*len(idx), "Some corpora clustering failed!"
 
     # Saving results:
