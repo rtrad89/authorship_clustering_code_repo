@@ -78,4 +78,4 @@ python cluster_docs.py m ./example/data/corpora hdp_lss_0.30_0.10_0.10_common_Tr
 
 ----
 
-<small>*This project is licensed under the terms of the MIT license.*</small>
+<small>*This project is licensed under the terms of the GPL-2.0 license.*</small>
