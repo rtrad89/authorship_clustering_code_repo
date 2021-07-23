@@ -104,7 +104,7 @@ def save_results(results: List[Dict], k_pred: List[List],
 
     timestamp = pd.to_datetime("now").strftime("%Y%m%d_%H%M%S")
 
-    Tools.initialise_directory(out_dir, purge=False)
+    Tools.initialise_directories(out_dir)
 
     # Construct the results path
     save_path = Tools.get_path(

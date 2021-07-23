@@ -3,9 +3,9 @@
 Run authorial clustering experiments on PAN-17 train dataset.
 
 """
-from lss_modeller import LssHdpModeller
-from aiders import Tools
-from clustering import Clusterer
+from .lss_modeller import LssHdpModeller
+from .aiders import Tools
+from .clustering import Clusterer
 import warnings
 
 warnings.filterwarnings(action="ignore")  # Supress warning for this code file

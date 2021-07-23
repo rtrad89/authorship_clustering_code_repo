@@ -13,7 +13,7 @@ from nltk.util import ngrams
 import time
 import pandas as pd
 from itertools import product
-from aiders import Tools
+from .aiders import Tools
 from typing import Tuple, List
 from collections import defaultdict
 import seaborn as sns
@@ -140,10 +140,10 @@ class LssHdpModeller:
         # Sterialise into LDA_C and store on disk
         output_dir = Tools.get_path(
             self.input_docs_path,
-            f"lda_c_format_{self.hdp_eta:0.1f}_{self.hdp_gamma_s:0.1f}",
+            f"lda_c_format_{self.hdp_eta:0.1f}_{self.hdp_gamma_s:0.1f}"
             f"_{self.hdp_alpha_s:0.1f}_common_{self.drop_uncommon}")
 
-        Tools.initialise_directory(output_dir)
+        Tools.initialise_directories(output_dir)
         save_location = Tools.get_path(
             output_dir, f"{self.lda_c_fname}.dat")
 
@@ -158,7 +158,7 @@ class LssHdpModeller:
 
         param_data = Tools.get_path(
             self.input_docs_path,
-            f"lda_c_format_{self.hdp_eta:0.1f}_{self.hdp_gamma_s:0.1f}",
+            f"lda_c_format_{self.hdp_eta:0.1f}_{self.hdp_gamma_s:0.1f}"
             f"_{self.hdp_alpha_s:0.1f}_common_{self.drop_uncommon}",
             f"{self.lda_c_fname}.dat")
 

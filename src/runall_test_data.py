@@ -3,9 +3,9 @@
 Run authorial clustering experiments on PAN-17 test dataset.
 
 """
-from lss_modeller import LssHdpModeller, LssBTModeller
-from aiders import Tools
-from clustering import Clusterer
+from .lss_modeller import LssHdpModeller, LssBTModeller
+from .aiders import Tools
+from .clustering import Clusterer
 from typing import List, Dict
 from time import perf_counter as tpc
 import warnings
